@@ -3,15 +3,7 @@
 pragma solidity ^0.8.9;
 
 import "@openzeppelin/contracts/utils/Address.sol";
-
-interface ICreate2Deployer {
-
-    event Deployed(address addr, uint256 salt, bytes[] calls);
-
-    function predictDeployAddress(bytes memory code, uint256 salt) external view returns (address addr);
-    function deploy(bytes memory code, uint256 salt) external returns (address addr);
-    function deployAndCall(bytes memory code, uint256 salt, bytes[] memory calls) external returns (address addr);
-}
+import "./ICreate2Deployer.sol";
 
 contract Create2Deployer is ICreate2Deployer {
     using Address for address;
