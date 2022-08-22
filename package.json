@@ -6,10 +6,10 @@
   "author": "Kevin Upton <kevin@soma.finance>",
   "license": "MIT",
   "scripts": {
-    "postinstall": "hardhat compile",
+    "postinstall": "yarn run compile",
     "lint": "gts lint",
     "clean": "gts clean",
-    "compile": "tsc",
+    "compile": "hardhat compile",
     "fix": "gts fix",
     "prepare": "yarn run compile",
     "pretest": "yarn run compile",

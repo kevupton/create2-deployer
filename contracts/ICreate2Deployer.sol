@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+
+pragma solidity ^0.8.9;
 
 interface ICreate2Deployer {
     event Deployed(address addr, uint256 salt, bytes[] calls);
