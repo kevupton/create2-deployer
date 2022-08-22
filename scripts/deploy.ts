@@ -13,7 +13,7 @@ async function main() {
   console.log('deployed at', create2Deployer.address);
   console.log(create2Deployer.deployTransaction.hash);
 
-  await new Promise(res => setTimeout(res, 120000));
+  await new Promise(res => setTimeout(res, 60000));
   console.log('verifying...');
 
   await run('verify:verify', {
