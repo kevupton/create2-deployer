@@ -1,6 +1,6 @@
 {
   "name": "create2-deployer",
-  "version": "1.0.0",
+  "version": "1.0.0-beta.1",
   "main": "index.js",
   "repository": "https://github.com/SOMA-Finance/create2-deployer.git",
   "author": "Kevin Upton <kevin@soma.finance>",
@@ -32,15 +32,16 @@
     "chai": "^4.2.0",
     "dotenv": "^16.0.1",
     "ethers": "^5.4.7",
+    "gts": "^3.1.0",
     "hardhat": "^2.10.2",
     "hardhat-gas-reporter": "^1.0.8",
     "solidity-coverage": "^0.7.21",
     "ts-node": ">=8.0.0",
     "typechain": "^8.1.0",
-    "typescript": ">=4.5.0",
-    "gts": "^3.1.0"
+    "typescript": ">=4.5.0"
   },
   "dependencies": {
-    "@openzeppelin/contracts": "^4.7.3"
+    "@openzeppelin/contracts": "^4.7.3",
+    "hardhat-package": "^1.0.0-beta.1"
   }
 }

@@ -1,6 +1,8 @@
 import 'dotenv/config';
 import {HardhatUserConfig} from 'hardhat/config';
 import '@nomicfoundation/hardhat-toolbox';
+import '@typechain/hardhat';
+import 'hardhat-package';
 
 const {PRIVATE_KEY, INFURA_API_KEY, ETHERSCAN_API_KEY} = process.env;
 
@@ -8,6 +10,12 @@ const accounts = PRIVATE_KEY ? [PRIVATE_KEY] : [];
 
 const config: HardhatUserConfig = {
   solidity: '0.8.9',
+  typechain: {
+    target: 'ethers-v5',
+  },
+  package: {
+    sources: 'contracts/hello',
+  },
   networks: {
     rinkeby: {
       url: `https://rinkeby.infura.io/v3/${INFURA_API_KEY}`,
