@@ -1,9 +1,10 @@
 import {Deployer} from './deployer';
-import {BigNumberish, Overrides} from 'ethers';
+import {BigNumberish, Contract, ContractFactory, Overrides} from 'ethers';
 import {
   BeaconProxy__factory,
   ERC1967Proxy__factory,
   ProxyAdmin__factory,
+  TransparentUpgradeableProxy,
   TransparentUpgradeableProxy__factory,
   UpgradeableBeacon__factory,
 } from '../proxies';
@@ -23,11 +24,13 @@ export function makeTemplates(deployer: Deployer) {
         overrides,
       });
     },
-    transparentUpgradeableProxy: async (
+    transparentUpgradeableProxy: async <
+      T extends Contract = TransparentUpgradeableProxy
+    >(
       salt?: BigNumberish,
       overrides?: Overrides
     ) => {
-      return deployer.deploy(
+      return deployer.deploy<ContractFactory>(
         new TransparentUpgradeableProxy__factory(deployer.signer),
         {
           args: [
@@ -38,7 +41,7 @@ export function makeTemplates(deployer: Deployer) {
           salt,
           overrides,
         }
-      );
+      ) as Promise<T>;
     },
     beaconProxy: async (salt?: BigNumberish, overrides?: Overrides) => {
       return deployer.deploy(new BeaconProxy__factory(deployer.signer), {
