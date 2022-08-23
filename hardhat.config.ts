@@ -14,7 +14,10 @@ const config: HardhatUserConfig = {
     target: 'ethers-v5',
   },
   package: {
-    sources: 'contracts/hello',
+    copy: [
+      {src: 'src/utils', dest: 'utils', exported: true},
+      {src: 'src/testing', dest: 'testing'},
+    ],
   },
   networks: {
     rinkeby: {
