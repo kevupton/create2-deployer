@@ -1,0 +1,10 @@
+export type {BeaconProxy} from './BeaconProxy';
+export {BeaconProxy__factory} from './BeaconProxy__factory';
+export type {ERC1967Proxy} from './ERC1967Proxy';
+export {ERC1967Proxy__factory} from './ERC1967Proxy__factory';
+export type {ProxyAdmin} from './ProxyAdmin';
+export {ProxyAdmin__factory} from './ProxyAdmin__factory';
+export type {TransparentUpgradeableProxy} from './TransparentUpgradeableProxy';
+export {TransparentUpgradeableProxy__factory} from './TransparentUpgradeableProxy__factory';
+export type {UpgradeableBeacon} from './UpgradeableBeacon';
+export {UpgradeableBeacon__factory} from './UpgradeableBeacon__factory';

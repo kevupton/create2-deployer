@@ -19,6 +19,8 @@ async function main() {
   await run('verify:verify', {
     address: create2Deployer.address,
   });
+
+  create2Deployer.createTemplate(ProxyAdm);
 }
 
 // We recommend this pattern to be able to use async/await everywhere

@@ -16,19 +16,23 @@ contract Create2Deployer {
         return address(uint160(uint256(hash)));
     }
 
-    function deploy(bytes memory bytecode, uint256 salt) public returns (address addr) {
+    function deploy(bytes memory bytecode, uint256 salt, bytes[] calldata calls) public returns (address addr) {
         assembly {
             addr := create2(0, add(bytecode, 0x20), mload(bytecode), salt)
             if iszero(extcodesize(addr)) {
                 revert(0, 0)
             }
         }
+
+        for (uint i = 0; i < calls.length; i++) {
+            addr.functionCall(calls[i]);
+        }
     }
 
-    function deployTemplate(bytes32 _templateId, uint256 salt) external returns (address) {
+    function deployTemplate(bytes32 _templateId, uint256 salt, bytes[] calldata calls) external returns (address) {
         bytes memory _template = template[_templateId];
         require(_template.length > 0, 'INVALID_TEMPLATE');
-        return deploy(_template, salt);
+        return deploy(_template, salt, calls);
     }
 
     function templateId(bytes calldata bytecode) public pure returns (bytes32) {

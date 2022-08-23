@@ -9,7 +9,15 @@ const {PRIVATE_KEY, INFURA_API_KEY, ETHERSCAN_API_KEY} = process.env;
 const accounts = PRIVATE_KEY ? [PRIVATE_KEY] : [];
 
 const config: HardhatUserConfig = {
-  solidity: '0.8.9',
+  solidity: {
+    version: '0.8.9',
+    settings: {
+      optimizer: {
+        enabled: true,
+        runs: 1000,
+      },
+    },
+  },
   typechain: {
     target: 'ethers-v5',
   },
@@ -17,6 +25,12 @@ const config: HardhatUserConfig = {
     copy: [
       {src: 'src/utils', dest: 'utils', exported: true},
       {src: 'src/testing', dest: 'testing'},
+      {
+        src: 'src/proxies',
+        dest: 'proxies',
+        exported: true,
+        exportedAs: 'proxies',
+      },
     ],
   },
   networks: {
