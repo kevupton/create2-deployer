@@ -27,6 +27,7 @@ export function makeTemplates(deployer: Deployer) {
     transparentUpgradeableProxy: async <
       T extends Contract = TransparentUpgradeableProxy
     >(
+      implementation: string,
       salt?: BigNumberish,
       overrides?: Overrides
     ) => {

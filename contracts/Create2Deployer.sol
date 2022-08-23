@@ -4,6 +4,7 @@ pragma solidity ^0.8.9;
 
 import "@openzeppelin/contracts/utils/Address.sol";
 
+// TODO add a clone method
 contract Create2Deployer {
     using Address for address;
 
