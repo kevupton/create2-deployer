@@ -46,7 +46,13 @@ export function makeTemplates(deployer: Deployer) {
     },
     transparentUpgradeableProxy: async <T extends Contract>(
       implementation: T,
-      {salt, overrides, proxyAdmin, upgradeCall, initializer}: ProxyOptions<T>
+      {
+        salt,
+        overrides,
+        proxyAdmin,
+        upgradeCall,
+        initializer,
+      }: ProxyOptions<T> = {}
     ) => {
       proxyAdmin = proxyAdmin ?? (await templates.proxyAdmin());
       const empty = await templates.empty();
