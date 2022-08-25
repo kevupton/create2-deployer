@@ -1,23 +1,19 @@
 import {ethers, run} from 'hardhat';
+import {Deployer} from '../src/utils';
 
 async function main() {
-  const create2DeployerFactory = await ethers.getContractFactory(
-    'Create2Deployer'
-  );
-  const create2Deployer = await create2DeployerFactory.deploy({
-    nonce: 0,
-  });
+  const [signer] = await ethers.getSigners();
+  const deployer = new Deployer(signer);
+  const empty = await deployer.templates.empty();
 
-  await create2Deployer.deployed();
-
-  console.log('deployed at', create2Deployer.address);
-  console.log(create2Deployer.deployTransaction.hash);
+  console.log('deployed at', empty.address);
+  console.log(empty.deployTransaction?.hash);
 
   await new Promise(res => setTimeout(res, 30000));
   console.log('verifying...');
 
   await run('verify:verify', {
-    address: create2Deployer.address,
+    address: empty.address,
   });
 }
 

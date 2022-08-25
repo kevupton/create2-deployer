@@ -44,6 +44,6 @@
   "dependencies": {
     "@openzeppelin/contracts": "^4.7.3",
     "@openzeppelin/upgrades-core": "^1.18.0",
-    "hardhat-package": "^1.0.0-beta.1"
+    "hardhat-package": "^1.0.0-beta.6"
   }
 }

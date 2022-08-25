@@ -31,7 +31,7 @@ export function makeTemplates(deployer: Deployer) {
       salt?: BigNumberish,
       overrides?: Overrides
     ) => {
-      return deployer.deploy<ContractFactory>(
+      return (await deployer.deploy<ContractFactory>(
         new TransparentUpgradeableProxy__factory(deployer.signer),
         {
           args: [
@@ -42,7 +42,7 @@ export function makeTemplates(deployer: Deployer) {
           salt,
           overrides,
         }
-      ) as Promise<T>;
+      )) as T & {isExisting: boolean};
     },
     beaconProxy: async (salt?: BigNumberish, overrides?: Overrides) => {
       return deployer.deploy(new BeaconProxy__factory(deployer.signer), {

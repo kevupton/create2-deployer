@@ -95,7 +95,6 @@ export class Deployer {
     } else {
       const bytecode = Deployer.bytecode(factory, args);
       const tx = await create2Deployer.deploy(bytecode, salt, calls, overrides);
-      contract._deployedPromise = tx.wait().then(() => contract);
       Object.defineProperty(contract, 'deployTransaction', {
         writable: false,
         value: tx,
