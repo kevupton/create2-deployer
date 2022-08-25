@@ -3,6 +3,7 @@
 pragma solidity ^0.8.9;
 
 import "@openzeppelin/contracts/utils/Address.sol";
+import "@openzeppelin/contracts/proxy/Clones.sol";
 
 // TODO add a clone method
 contract Create2Deployer {
@@ -15,6 +16,14 @@ contract Create2Deployer {
             abi.encodePacked(bytes1(0xff), address(this), salt, keccak256(bytecode))
         );
         return address(uint160(uint256(hash)));
+    }
+
+    function cloneAddress(address target, uint256 salt) public view returns (address addr) {
+        return Clones.predictDeterministicAddress(target, salt);
+    }
+
+    function templateId(bytes calldata bytecode) public pure returns (bytes32) {
+        return keccak256(bytecode);
     }
 
     function deploy(bytes memory bytecode, uint256 salt, bytes[] calldata calls) public returns (address addr) {
@@ -30,14 +39,14 @@ contract Create2Deployer {
         }
     }
 
+    function clone(address target, uint256 salt) public returns (address addr) {
+        return Clones.cloneDeterministic(target, salt);
+    }
+
     function deployTemplate(bytes32 _templateId, uint256 salt, bytes[] calldata calls) external returns (address) {
         bytes memory _template = template[_templateId];
         require(_template.length > 0, 'INVALID_TEMPLATE');
         return deploy(_template, salt, calls);
-    }
-
-    function templateId(bytes calldata bytecode) public pure returns (bytes32) {
-        return keccak256(bytecode);
     }
 
     function createTemplate(bytes calldata bytecode) external returns (bytes32 _templateId) {
