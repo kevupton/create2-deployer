@@ -1,14 +1,34 @@
 import {Deployer} from './deployer';
-import {BigNumberish, Contract, ContractFactory, Overrides} from 'ethers';
+import {
+  BigNumber,
+  BigNumberish,
+  Contract,
+  ContractFactory,
+  Overrides,
+} from 'ethers';
 import {
   BeaconProxy__factory,
   ERC1967Proxy__factory,
+  ProxyAdmin,
   ProxyAdmin__factory,
-  TransparentUpgradeableProxy,
   TransparentUpgradeableProxy__factory,
   UpgradeableBeacon__factory,
 } from '../proxies';
 import {Empty__factory} from '../../typechain-types';
+import {defaultAbiCoder} from 'ethers/lib/utils';
+
+export interface FunctionCall<T extends Contract> {
+  id: keyof T['interface']['functions'];
+  args?: ReadonlyArray<unknown>;
+}
+
+export interface ProxyOptions<T extends Contract> {
+  salt?: BigNumberish;
+  overrides?: Overrides;
+  proxyAdmin?: ProxyAdmin;
+  upgradeCall?: FunctionCall<T>;
+  initializer?: FunctionCall<T>;
+}
 
 export function makeTemplates(deployer: Deployer) {
   const templates = {
@@ -24,25 +44,49 @@ export function makeTemplates(deployer: Deployer) {
         overrides,
       });
     },
-    transparentUpgradeableProxy: async <
-      T extends Contract = TransparentUpgradeableProxy
-    >(
-      implementation: string,
-      salt?: BigNumberish,
-      overrides?: Overrides
+    transparentUpgradeableProxy: async <T extends Contract>(
+      implementation: T,
+      {salt, overrides, proxyAdmin, upgradeCall, initializer}: ProxyOptions<T>
     ) => {
-      return (await deployer.deploy<ContractFactory>(
+      proxyAdmin = proxyAdmin ?? (await templates.proxyAdmin());
+      const empty = await templates.empty();
+      const proxy = (await deployer.deploy<ContractFactory>(
         new TransparentUpgradeableProxy__factory(deployer.signer),
         {
-          args: [
-            (await templates.empty()).address,
-            (await templates.proxyAdmin()).address,
-            '0x',
-          ],
+          args: [empty.address, proxyAdmin.address, '0x'],
           salt,
           overrides,
         }
       )) as T & {isExisting: boolean};
+
+      const currentImpl = BigNumber.from(
+        await proxyAdmin.getProxyImplementation(proxy.address)
+      );
+
+      let call: FunctionCall<T> | undefined;
+      if (initializer && currentImpl.eq(empty.address)) {
+        call = initializer;
+      } else if (upgradeCall && !currentImpl.eq(implementation.address)) {
+        call = upgradeCall;
+      }
+
+      const data = call
+        ? defaultAbiCoder.encode(
+            implementation.interface.functions[call.id.toString()].inputs.map(
+              input => input.type
+            ),
+            call.args || []
+          )
+        : undefined;
+
+      const tx = data
+        ? await proxyAdmin.upgradeAndCall(
+            proxy.address,
+            implementation.address,
+            data
+          )
+        : await proxyAdmin.upgrade(proxy.address, implementation.address);
+      await tx.wait();
     },
     beaconProxy: async (salt?: BigNumberish, overrides?: Overrides) => {
       return deployer.deploy(new BeaconProxy__factory(deployer.signer), {
