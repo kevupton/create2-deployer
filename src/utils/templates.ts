@@ -93,6 +93,8 @@ export function makeTemplates(deployer: Deployer) {
           )
         : await proxyAdmin.upgrade(proxy.address, implementation.address);
       await tx.wait();
+
+      return proxy;
     },
     beaconProxy: async (salt?: BigNumberish, overrides?: Overrides) => {
       return deployer.deploy(new BeaconProxy__factory(deployer.signer), {
