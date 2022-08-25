@@ -17,17 +17,20 @@ import {
 import {Empty__factory} from '../../typechain-types';
 import {defaultAbiCoder} from 'ethers/lib/utils';
 
+export type FunctionName<T extends Contract> =
+  keyof T['interface']['functions'];
+
 export interface FunctionCall<T extends Contract> {
-  id: keyof T['interface']['functions'];
-  args?: ReadonlyArray<unknown>;
+  id: FunctionName<T>;
+  args: ReadonlyArray<unknown>;
 }
 
 export interface ProxyOptions<T extends Contract> {
   salt?: BigNumberish;
   overrides?: Overrides;
   proxyAdmin?: ProxyAdmin;
-  upgradeCall?: FunctionCall<T>;
-  initializer?: FunctionCall<T>;
+  upgradeCall?: FunctionCall<T> | FunctionName<T>;
+  initializer?: FunctionCall<T> | FunctionName<T>;
 }
 
 export function makeTemplates(deployer: Deployer) {
@@ -71,9 +74,15 @@ export function makeTemplates(deployer: Deployer) {
 
       let call: FunctionCall<T> | undefined;
       if (initializer && currentImpl.eq(empty.address)) {
-        call = initializer;
+        call =
+          typeof initializer !== 'object'
+            ? {id: initializer, args: []}
+            : initializer;
       } else if (upgradeCall && !currentImpl.eq(implementation.address)) {
-        call = upgradeCall;
+        call =
+          typeof upgradeCall !== 'object'
+            ? {id: upgradeCall, args: []}
+            : upgradeCall;
       }
 
       const data = call
