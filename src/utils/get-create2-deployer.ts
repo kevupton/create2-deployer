@@ -3,7 +3,7 @@ import {Create2Deployer__factory} from '../../typechain-types';
 import {hexDataLength} from 'ethers/lib/utils';
 
 export const CREATE2_DEPLOYER_ADDRESS =
-  '0x45A1A1a7d02436e0D83a15E177a551F4e8B3a33c';
+  '0x4275F0C060Ebe50272f1e483d0E144F83c31d910';
 
 export async function getCreate2Deployer(signer: Signer) {
   if (!signer.provider) {

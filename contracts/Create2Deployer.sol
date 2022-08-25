@@ -19,7 +19,7 @@ contract Create2Deployer {
     }
 
     function cloneAddress(address target, uint256 salt) public view returns (address addr) {
-        return Clones.predictDeterministicAddress(target, salt);
+        return Clones.predictDeterministicAddress(target, bytes32(salt));
     }
 
     function templateId(bytes calldata bytecode) public pure returns (bytes32) {
@@ -40,7 +40,7 @@ contract Create2Deployer {
     }
 
     function clone(address target, uint256 salt) public returns (address addr) {
-        return Clones.cloneDeterministic(target, salt);
+        return Clones.cloneDeterministic(target, bytes32(salt));
     }
 
     function deployTemplate(bytes32 _templateId, uint256 salt, bytes[] calldata calls) external returns (address) {

@@ -4,6 +4,7 @@ import {
   BytesLike,
   Contract,
   ContractFactory,
+  ContractTransaction,
   Overrides,
 } from 'ethers';
 import {
@@ -15,6 +16,7 @@ import {
   hexConcat,
   hexDataLength,
   hexDataSlice,
+  hexlify,
   hexZeroPad,
   keccak256,
 } from 'ethers/lib/utils';
@@ -33,6 +35,11 @@ export interface DeployOptions<T extends ContractFactory> {
   args?: Head<Parameters<T['deploy']>>;
   salt?: BigNumberish;
   calls?: BytesLike[];
+  overrides?: Overrides & {from?: string | Promise<string>};
+}
+
+export interface CloneOptions {
+  salt?: BigNumberish;
   overrides?: Overrides & {from?: string | Promise<string>};
 }
 
@@ -108,6 +115,36 @@ export class Deployer {
     return contract;
   }
 
+  async clone(
+    target: string,
+    {salt = this.defaultSalt, overrides = {}}: CloneOptions = {}
+  ): Promise<{
+    address: string;
+    isExisting: boolean;
+    deployed: Promise<string>;
+    deployTransaction?: ContractTransaction;
+  }> {
+    const create2Deployer = await this.create2DeployerPromise;
+    const contractAddress = await this.cloneAddress(target, salt);
+    const code = await this.provider.getCode(contractAddress);
+
+    if (hexDataLength(code)) {
+      return {
+        isExisting: true,
+        deployed: Promise.resolve(contractAddress),
+        address: contractAddress,
+      };
+    } else {
+      const tx = await create2Deployer.clone(target, salt, overrides);
+      return {
+        isExisting: false,
+        address: contractAddress,
+        deployed: tx.wait().then(() => contractAddress),
+        deployTransaction: tx,
+      };
+    }
+  }
+
   async deployArtifact(
     artifact: Artifact,
     args: BytesLike = '0x',
@@ -140,6 +177,13 @@ export class Deployer {
     return Deployer.deployAddress(Deployer.bytecode(factory, args), salt);
   }
 
+  cloneAddress<T extends ContractFactory>(
+    target: BytesLike,
+    salt = this.defaultSalt
+  ): string {
+    return Deployer.cloneAddress(target, salt);
+  }
+
   async createTemplate<T extends ContractFactory>(
     factory: T,
     {args, overrides = {}}: CreateTemplateOptions<T> = {}
@@ -155,14 +199,6 @@ export class Deployer {
     }
 
     return templateId;
-  }
-
-  static deployAddress(bytecode: BytesLike, salt: BigNumberish) {
-    salt = hexZeroPad(BigNumber.from(salt).toHexString(), 32);
-    const hash = keccak256(
-      hexConcat(['0xff', CREATE2_DEPLOYER_ADDRESS, salt, keccak256(bytecode)])
-    );
-    return hexDataSlice(hash, 12, 32);
   }
 
   static templateId<T extends ContractFactory>(
@@ -184,5 +220,35 @@ export class Deployer {
         )
       : '0x';
     return hexConcat([factory.bytecode, abiEncodedArgs]);
+  }
+
+  private static cloneAddress(target: BytesLike, salt: BigNumberish) {
+    const hashed = keccak256(
+      hexConcat([
+        '0x3d602d80600a3d3981f3363d3d373d3d3d363d73',
+        target,
+        '0x5af43d82803e903d91602b57fd5bf3ff',
+      ])
+    );
+
+    return hexDataSlice(
+      keccak256(
+        hexConcat([
+          CREATE2_DEPLOYER_ADDRESS,
+          hexZeroPad(hexlify(salt), 32),
+          hashed,
+        ])
+      ),
+      0,
+      20
+    );
+  }
+
+  static deployAddress(bytecode: BytesLike, salt: BigNumberish) {
+    salt = hexZeroPad(hexlify(salt), 32);
+    const hash = keccak256(
+      hexConcat(['0xff', CREATE2_DEPLOYER_ADDRESS, salt, keccak256(bytecode)])
+    );
+    return hexDataSlice(hash, 12, 32);
   }
 }

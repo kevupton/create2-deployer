@@ -15,7 +15,8 @@
     "pretest": "yarn run compile",
     "posttest": "yarn run lint",
     "package": "hardhat package",
-    "deploy": "hardhat run scripts/deploy.ts"
+    "deploy": "hardhat run scripts/deploy.ts",
+    "deploy-empty": "hardhat run scripts/deploy-empty.ts"
   },
   "devDependencies": {
     "@ethersproject/abi": "^5.4.7",
