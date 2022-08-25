@@ -9,6 +9,7 @@ async function main() {
   console.log('deployed at', empty.address);
   console.log(empty.deployTransaction?.hash);
 
+  await empty.deployed();
   await new Promise(res => setTimeout(res, 30000));
   console.log('verifying...');
 
