@@ -12,3 +12,10 @@ yarn add -D create2-deployer
 ```
 
 ## Usage
+
+```ts
+import {Deployer} from 'create2-deployer';
+
+const signer = await ethers.getSigner(address);
+const deployer = new Deployer(signer);
+```
