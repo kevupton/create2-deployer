@@ -1,5 +1,4 @@
 import {
-  BigNumber,
   BigNumberish,
   BytesLike,
   Contract,

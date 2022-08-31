@@ -14,7 +14,7 @@ import {
   TransparentUpgradeableProxy__factory,
   UpgradeableBeacon__factory,
 } from '../proxies';
-import {Empty__factory} from '../../typechain-types';
+import {Empty__factory} from '../../typechain-types/factories/Empty__factory';
 import {defaultAbiCoder} from 'ethers/lib/utils';
 
 export type FunctionName<T extends Contract> =
