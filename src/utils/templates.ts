@@ -115,12 +115,19 @@ export function makeTemplates(deployer: Deployer) {
         : await proxyAdmin.upgrade(proxy.address, implementation.address);
       await tx.wait();
 
-      const result = implementation.attach(proxy.address);
+      const result: T & {isExisting: boolean} = implementation.attach(
+        proxy.address
+      ) as T & {isExisting: boolean};
       result._deployedPromise = (async () => {
         await proxy.deployed();
         await implementation.deployed();
         return result;
       })();
+
+      Object.defineProperty(result, 'isExisting', {
+        writable: false,
+        value: proxy.isExisting,
+      });
 
       return result;
     },
