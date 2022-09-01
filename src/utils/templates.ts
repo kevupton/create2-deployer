@@ -4,7 +4,6 @@ import {
   BigNumberish,
   Contract,
   ContractFactory,
-  ContractInterface,
   Overrides,
 } from 'ethers';
 import {
@@ -19,12 +18,10 @@ import {Empty__factory} from '../../typechain-types/factories/Empty__factory';
 import {
   defaultAbiCoder,
   hexConcat,
-  hexDataSlice,
   Interface,
   keccak256,
   toUtf8Bytes,
 } from 'ethers/lib/utils';
-import {FormatTypes} from '@ethersproject/abi/lib.esm';
 
 export type FunctionName<T extends Contract> =
   keyof T['interface']['functions'];
