@@ -4,6 +4,7 @@ import {
   BigNumberish,
   Contract,
   ContractFactory,
+  ContractInterface,
   Overrides,
 } from 'ethers';
 import {
@@ -15,7 +16,15 @@ import {
   UpgradeableBeacon__factory,
 } from '../proxies';
 import {Empty__factory} from '../../typechain-types/factories/Empty__factory';
-import {defaultAbiCoder} from 'ethers/lib/utils';
+import {
+  defaultAbiCoder,
+  hexConcat,
+  hexDataSlice,
+  Interface,
+  keccak256,
+  toUtf8Bytes,
+} from 'ethers/lib/utils';
+import {FormatTypes} from '@ethersproject/abi/lib.esm';
 
 export type FunctionName<T extends Contract> =
   keyof T['interface']['functions'];
@@ -48,6 +57,7 @@ export function makeTemplates(deployer: Deployer) {
       });
     },
     transparentUpgradeableProxy: async <T extends Contract>(
+      id: string,
       implementation: T,
       {
         salt,
@@ -58,6 +68,13 @@ export function makeTemplates(deployer: Deployer) {
       }: ProxyOptions<T> = {}
     ) => {
       proxyAdmin = proxyAdmin ?? (await templates.proxyAdmin());
+      salt = keccak256(
+        hexConcat([
+          toUtf8Bytes(id),
+          BigNumber.from(salt ?? deployer.defaultSalt).toHexString(),
+        ])
+      );
+
       const empty = await templates.empty();
       const proxy = (await deployer.deploy<ContractFactory>(
         new TransparentUpgradeableProxy__factory(deployer.signer),
@@ -86,12 +103,7 @@ export function makeTemplates(deployer: Deployer) {
       }
 
       const data = call
-        ? defaultAbiCoder.encode(
-            implementation.interface.functions[call.id.toString()].inputs.map(
-              input => input.type
-            ),
-            call.args || []
-          )
+        ? encodeFunctionCall<T>(implementation.interface, call)
         : undefined;
 
       const tx = data
@@ -103,7 +115,14 @@ export function makeTemplates(deployer: Deployer) {
         : await proxyAdmin.upgrade(proxy.address, implementation.address);
       await tx.wait();
 
-      return proxy;
+      const result = implementation.attach(proxy.address);
+      result._deployedPromise = (async () => {
+        await proxy.deployed();
+        await implementation.deployed();
+        return result;
+      })();
+
+      return result;
     },
     beaconProxy: async (salt?: BigNumberish, overrides?: Overrides) => {
       return deployer.deploy(new BeaconProxy__factory(deployer.signer), {
@@ -132,6 +151,20 @@ export function makeTemplates(deployer: Deployer) {
     },
   };
   return templates;
+}
+
+function encodeFunctionCall<T extends Contract>(
+  int: Interface,
+  call: FunctionCall<T>
+) {
+  const fn = int.functions[call.id.toString()];
+  return hexConcat([
+    int.getSighash(fn),
+    defaultAbiCoder.encode(
+      fn.inputs.map(input => input.type),
+      call.args || []
+    ),
+  ]);
 }
 
 function transferOwnership(account: string) {
