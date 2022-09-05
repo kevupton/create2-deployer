@@ -84,7 +84,7 @@ export class Deployer {
     }: DeployOptions<T> = {}
   ): Promise<ReturnType<T['attach']> & {isExisting: boolean}> {
     const create2Deployer = await this.create2DeployerPromise;
-    const contractAddress = await this.deployAddress(factory, {args, salt});
+    const contractAddress = await this.factoryAddress(factory, {args, salt});
     const code = await this.provider.getCode(contractAddress);
     const contract = factory
       .connect(this.signer)
@@ -169,11 +169,11 @@ export class Deployer {
     return contract;
   }
 
-  deployAddress<T extends ContractFactory>(
+  factoryAddress<T extends ContractFactory>(
     factory: T,
     {args, salt = this.defaultSalt}: DeployAddressOptions<T> = {}
   ): string {
-    return Deployer.deployAddress(Deployer.bytecode(factory, args), salt);
+    return Deployer.factoryAddress(factory, {args, salt});
   }
 
   cloneAddress<T extends ContractFactory>(
@@ -241,6 +241,13 @@ export class Deployer {
       0,
       20
     );
+  }
+
+  static factoryAddress<T extends ContractFactory>(
+    factory: T,
+    {args, salt}: DeployAddressOptions<T> = {}
+  ): string {
+    return this.deployAddress(this.bytecode(factory, args), salt || 0);
   }
 
   static deployAddress(bytecode: BytesLike, salt: BigNumberish) {

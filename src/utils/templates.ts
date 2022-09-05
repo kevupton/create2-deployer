@@ -41,11 +41,18 @@ export interface ProxyOptions<T extends Contract> {
 
 export function makeTemplates(deployer: Deployer) {
   const templates = {
+    proxyAdminFactory: new ProxyAdmin__factory(deployer.signer),
+    beaconProxyFactory: new BeaconProxy__factory(deployer.signer),
+    upgradeableBeaconFactory: new UpgradeableBeacon__factory(deployer.signer),
+    emptyFactory: new Empty__factory(deployer.signer),
+    transparentUpgradeableProxyFactory:
+      new TransparentUpgradeableProxy__factory(deployer.signer),
     empty: async (overrides?: Overrides) =>
       deployer.deploy(new Empty__factory(deployer.signer), {
         salt: 0,
         overrides,
       }),
+    emptyAddress: Deployer.factoryAddress(new Empty__factory()),
     proxyAdmin: async (overrides?: Overrides) => {
       return deployer.deploy(new ProxyAdmin__factory(deployer.signer), {
         calls: [transferOwnership(deployer.signer.address)],
@@ -53,6 +60,9 @@ export function makeTemplates(deployer: Deployer) {
         overrides,
       });
     },
+    proxyAdminAddress: Deployer.factoryAddress(new ProxyAdmin__factory(), {
+      salt: deployer.signer.address,
+    }),
     transparentUpgradeableProxy: async <T extends Contract>(
       id: string,
       implementation: T,
@@ -65,19 +75,12 @@ export function makeTemplates(deployer: Deployer) {
       }: ProxyOptions<T> = {}
     ) => {
       proxyAdmin = proxyAdmin ?? (await templates.proxyAdmin());
-      salt = keccak256(
-        hexConcat([
-          toUtf8Bytes(id),
-          BigNumber.from(salt ?? deployer.defaultSalt).toHexString(),
-        ])
-      );
-
       const empty = await templates.empty();
       const proxy = (await deployer.deploy<ContractFactory>(
         new TransparentUpgradeableProxy__factory(deployer.signer),
         {
           args: [empty.address, proxyAdmin.address, '0x'],
-          salt,
+          salt: templates.proxySalt(id, salt),
           overrides,
         }
       )) as T & {isExisting: boolean};
@@ -128,24 +131,57 @@ export function makeTemplates(deployer: Deployer) {
 
       return result;
     },
-    beaconProxy: async (salt?: BigNumberish, overrides?: Overrides) => {
+    transparentUpgradeableProxyAddress: (id: string, salt?: BigNumberish) => {
+      return Deployer.factoryAddress(
+        new TransparentUpgradeableProxy__factory(),
+        {
+          args: [templates.emptyAddress, templates.proxyAdminAddress, '0x'],
+          salt: templates.proxySalt(id, salt),
+        }
+      );
+    },
+    beaconProxy: async (
+      beaconAddress: string,
+      id?: string,
+      salt?: BigNumberish,
+      overrides?: Overrides
+    ) => {
       return deployer.deploy(new BeaconProxy__factory(deployer.signer), {
-        args: [(await templates.upgradeableBeacon(salt)).address, '0x'],
-        salt,
+        args: [beaconAddress, '0x'],
+        salt: templates.proxySalt(id, salt),
         overrides,
       });
     },
-    upgradeableBeacon: async (salt?: BigNumberish, overrides?: Overrides) => {
+    beaconProxyAddress: async (
+      beaconAddress: string,
+      id?: string,
+      salt?: BigNumberish
+    ) => {
+      return Deployer.factoryAddress(new BeaconProxy__factory(), {
+        args: [beaconAddress, '0x'],
+        salt,
+      });
+    },
+    upgradeableBeacon: async (
+      id?: string,
+      salt?: BigNumberish,
+      overrides?: Overrides
+    ) => {
       return await deployer.deploy(
         new UpgradeableBeacon__factory(deployer.signer),
         {
-          args: [(await templates.empty()).address],
+          args: [templates.emptyAddress],
           calls: [transferOwnership(deployer.address)],
           salt,
           overrides,
         }
       );
     },
+    upgradeableBeaconAddress: (id?: string, salt?: BigNumberish) =>
+      Deployer.factoryAddress(new UpgradeableBeacon__factory(), {
+        salt: templates.proxySalt(id, salt),
+        args: [templates.emptyAddress],
+      }),
     erc1967Proxy: async (salt?: BigNumberish, overrides?: Overrides) => {
       return await deployer.deploy(new ERC1967Proxy__factory(deployer.signer), {
         args: [(await templates.empty()).address, '0x'],
@@ -153,7 +189,16 @@ export function makeTemplates(deployer: Deployer) {
         overrides,
       });
     },
+    proxySalt(id = 'default', salt = deployer.defaultSalt) {
+      return keccak256(
+        hexConcat([
+          toUtf8Bytes(id),
+          BigNumber.from(salt ?? deployer.defaultSalt).toHexString(),
+        ])
+      );
+    },
   };
+  Object.freeze(templates);
   return templates;
 }
 
