@@ -67,7 +67,7 @@ export class Deployer {
 
   constructor(
     public readonly signer: SignerWithAddress,
-    public readonly defaultSalt: BigNumberish = 0
+    public readonly defaultSalt: BigNumberish = process.env.DEFAULT_SALT || '0'
   ) {
     if (!this.signer) {
       throw new Error('missing provider inside signer');
