@@ -1,4 +1,5 @@
 import {
+  BigNumber,
   BigNumberish,
   BytesLike,
   Contract,
@@ -15,7 +16,6 @@ import {
   hexConcat,
   hexDataLength,
   hexDataSlice,
-  hexlify,
   hexZeroPad,
   keccak256,
 } from 'ethers/lib/utils';
@@ -84,7 +84,7 @@ export class Deployer {
     }: DeployOptions<T> = {}
   ): Promise<ReturnType<T['attach']> & {isExisting: boolean}> {
     const create2Deployer = await this.create2DeployerPromise;
-    const contractAddress = await this.factoryAddress(factory, {args, salt});
+    const contractAddress = Deployer.factoryAddress(factory, {args, salt});
     const code = await this.provider.getCode(contractAddress);
     const contract = factory
       .connect(this.signer)
@@ -234,7 +234,7 @@ export class Deployer {
       keccak256(
         hexConcat([
           CREATE2_DEPLOYER_ADDRESS,
-          hexZeroPad(hexlify(salt), 32),
+          hexZeroPad(BigNumber.from(salt).toHexString(), 32),
           hashed,
         ])
       ),
@@ -251,7 +251,7 @@ export class Deployer {
   }
 
   static deployAddress(bytecode: BytesLike, salt: BigNumberish) {
-    salt = hexZeroPad(hexlify(salt), 32);
+    salt = hexZeroPad(BigNumber.from(salt).toHexString(), 32);
     const hash = keccak256(
       hexConcat(['0xff', CREATE2_DEPLOYER_ADDRESS, salt, keccak256(bytecode)])
     );
