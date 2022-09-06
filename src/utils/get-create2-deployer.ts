@@ -1,5 +1,5 @@
 import {Signer} from 'ethers';
-import {Create2Deployer__factory} from '../../typechain-types/factories/contracts/Create2Deployer__factory';
+import {Create2Deployer__factory} from '../../typechain-types/factories/Create2Deployer__factory';
 import {hexDataLength} from 'ethers/lib/utils';
 
 export const CREATE2_DEPLOYER_ADDRESS =

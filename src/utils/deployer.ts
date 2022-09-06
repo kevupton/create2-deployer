@@ -22,7 +22,7 @@ import {
 import {Artifact} from 'hardhat/types';
 import {SignerWithAddress} from '@nomiclabs/hardhat-ethers/signers';
 import {makeTemplates} from './templates';
-import {Create2Deployer} from '../../typechain-types';
+import {Create2Deployer} from '../../typechain-types/Create2Deployer';
 
 export type Head<T extends unknown[]> = T extends [
   ...other: infer Head,

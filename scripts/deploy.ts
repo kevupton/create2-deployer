@@ -6,34 +6,30 @@ async function main() {
   const create2DeployerFactory = await ethers.getContractFactory(
     'Create2Deployer'
   );
-  const create2Deployer = await create2DeployerFactory.deploy({
-    nonce: 0,
-  });
 
-  await create2Deployer.deployed();
-
-  console.log('deployer', create2Deployer.address);
-  console.log(create2Deployer.deployTransaction.hash);
+  try {
+    const create2Deployer = await create2DeployerFactory.deploy({
+      nonce: 0,
+    });
+    await create2Deployer.deployed();
+    console.log('deployer', create2Deployer.address);
+    console.log(create2Deployer.deployTransaction.hash);
+  } catch (e: any) {
+    console.error(e.message);
+  }
 
   const deployer = new Deployer(signer);
 
-  const empty = await deployer.templates.empty();
-  console.log('empty', empty.address);
-  await empty.deployed();
-
-  const owner = await deployer.templates.owner();
-  console.log('owner', owner.address);
-  await owner.deployed();
+  const placeholder = await deployer.templates.placeholder();
+  console.log('placeholder', placeholder.address);
+  await placeholder.deployed();
 
   await new Promise(res => setTimeout(res, 10000));
   console.log('verifying...');
 
   await Promise.all([
     run('verify:verify', {
-      address: empty.address,
-    }).catch(e => console.error(e.message)),
-    run('verify:verify', {
-      address: owner.address,
+      address: placeholder.address,
     }).catch(e => console.error(e.message)),
     run('verify:verify', {
       address: CREATE2_DEPLOYER_ADDRESS,

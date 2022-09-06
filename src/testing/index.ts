@@ -18,8 +18,8 @@ task(TASK_TEST_SETUP_TEST_ENVIRONMENT).setAction(
     ]);
 
     const deployer = new Deployer(signer);
-    await deployer.templates.empty();
-    await deployer.templates.owner();
+
+    await deployer.templates.placeholder();
 
     console.log('Create2 Deployer Setup');
   }
