@@ -41,10 +41,10 @@ export interface ProxyOptions<T extends Contract> {
   initializer?: FunctionCall<T> | FunctionName<T>;
 }
 
-const OWNER_ADDRESS = Deployer.factoryAddress(new Owner__factory());
-const EMPTY_ADDRESS = Deployer.factoryAddress(new Empty__factory());
-
 export function makeTemplates(deployer: Deployer) {
+  const OWNER_ADDRESS = Deployer.factoryAddress(new Owner__factory());
+  const EMPTY_ADDRESS = Deployer.factoryAddress(new Empty__factory());
+
   const templates = {
     ownerFactory: new Owner__factory(deployer.signer),
     proxyAdminFactory: new ProxyAdmin__factory(deployer.signer),
@@ -227,45 +227,46 @@ export function makeTemplates(deployer: Deployer) {
     },
   };
   Object.freeze(templates);
+
   return templates;
-}
 
-function encodeFunctionCall<T extends Contract>(
-  int: Interface,
-  call: FunctionCall<T>
-) {
-  const fn = int.functions[call.id.toString()];
-  return hexConcat([
-    int.getSighash(fn),
-    defaultAbiCoder.encode(
-      fn.inputs.map(input => input.type),
-      call.args || []
-    ),
-  ]);
-}
+  function encodeFunctionCall<T extends Contract>(
+    int: Interface,
+    call: FunctionCall<T>
+  ) {
+    const fn = int.functions[call.id.toString()];
+    return hexConcat([
+      int.getSighash(fn),
+      defaultAbiCoder.encode(
+        fn.inputs.map(input => input.type),
+        call.args || []
+      ),
+    ]);
+  }
 
-function ownableTransferOwnership(
-  target: string,
-  account: string
-): Create2Deployer.FunctionCallStruct {
-  return {
-    target,
-    data: ProxyAdmin__factory.createInterface().encodeFunctionData(
-      'transferOwnership',
-      [account]
-    ),
-  };
-}
+  function ownableTransferOwnership(
+    target: string,
+    account: string
+  ): Create2Deployer.FunctionCallStruct {
+    return {
+      target,
+      data: ProxyAdmin__factory.createInterface().encodeFunctionData(
+        'transferOwnership',
+        [account]
+      ),
+    };
+  }
 
-function ownerTransferOwnership(
-  target: string,
-  account: string
-): Create2Deployer.FunctionCallStruct {
-  return {
-    target: OWNER_ADDRESS,
-    data: Owner__factory.createInterface().encodeFunctionData(
-      'transferOwnership',
-      [target, account]
-    ),
-  };
+  function ownerTransferOwnership(
+    target: string,
+    account: string
+  ): Create2Deployer.FunctionCallStruct {
+    return {
+      target: OWNER_ADDRESS,
+      data: Owner__factory.createInterface().encodeFunctionData(
+        'transferOwnership',
+        [target, account]
+      ),
+    };
+  }
 }

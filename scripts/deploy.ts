@@ -1,5 +1,5 @@
 import {ethers, run} from 'hardhat';
-import {Deployer} from '../src/utils';
+import {CREATE2_DEPLOYER_ADDRESS, Deployer} from '../src/utils';
 
 async function main() {
   const [signer] = await ethers.getSigners();
@@ -36,7 +36,7 @@ async function main() {
       address: owner.address,
     }).catch(e => console.error(e.message)),
     run('verify:verify', {
-      address: create2Deployer.address,
+      address: CREATE2_DEPLOYER_ADDRESS,
     }).catch(e => console.error(e.message)),
   ]);
 }
