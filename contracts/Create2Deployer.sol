@@ -9,6 +9,11 @@ import "@openzeppelin/contracts/proxy/Clones.sol";
 contract Create2Deployer {
     using Address for address;
 
+    struct FunctionCall {
+        address target;
+        bytes data;
+    }
+
     mapping(bytes32 => bytes) public template;
 
     function deployAddress(bytes memory bytecode, uint256 salt) public view returns (address addr) {
@@ -26,7 +31,7 @@ contract Create2Deployer {
         return keccak256(bytecode);
     }
 
-    function deploy(bytes memory bytecode, uint256 salt, bytes[] calldata calls) public returns (address addr) {
+    function deploy(bytes memory bytecode, uint256 salt, FunctionCall[] calldata calls) public returns (address addr) {
         assembly {
             addr := create2(0, add(bytecode, 0x20), mload(bytecode), salt)
             if iszero(extcodesize(addr)) {
@@ -35,7 +40,7 @@ contract Create2Deployer {
         }
 
         for (uint i = 0; i < calls.length; i++) {
-            addr.functionCall(calls[i]);
+            calls[i].target.functionCall(calls[i].data);
         }
     }
 
@@ -43,7 +48,7 @@ contract Create2Deployer {
         return Clones.cloneDeterministic(target, bytes32(salt));
     }
 
-    function deployTemplate(bytes32 _templateId, uint256 salt, bytes[] calldata calls) external returns (address) {
+    function deployTemplate(bytes32 _templateId, uint256 salt, FunctionCall[] calldata calls) external returns (address) {
         bytes memory _template = template[_templateId];
         require(_template.length > 0, 'INVALID_TEMPLATE');
         return deploy(_template, salt, calls);

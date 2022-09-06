@@ -1,6 +1,8 @@
 import {ethers, run} from 'hardhat';
+import {Deployer} from '../src/utils';
 
 async function main() {
+  const [signer] = await ethers.getSigners();
   const create2DeployerFactory = await ethers.getContractFactory(
     'Create2Deployer'
   );
@@ -10,15 +12,33 @@ async function main() {
 
   await create2Deployer.deployed();
 
-  console.log('deployed at', create2Deployer.address);
+  console.log('deployer', create2Deployer.address);
   console.log(create2Deployer.deployTransaction.hash);
 
-  await new Promise(res => setTimeout(res, 30000));
+  const deployer = new Deployer(signer);
+
+  const empty = await deployer.templates.empty();
+  console.log('empty', empty.address);
+  await empty.deployed();
+
+  const owner = await deployer.templates.owner();
+  console.log('owner', owner.address);
+  await owner.deployed();
+
+  await new Promise(res => setTimeout(res, 10000));
   console.log('verifying...');
 
-  await run('verify:verify', {
-    address: create2Deployer.address,
-  });
+  await Promise.all([
+    run('verify:verify', {
+      address: empty.address,
+    }).catch(e => console.error(e.message)),
+    run('verify:verify', {
+      address: owner.address,
+    }).catch(e => console.error(e.message)),
+    run('verify:verify', {
+      address: create2Deployer.address,
+    }).catch(e => console.error(e.message)),
+  ]);
 }
 
 // We recommend this pattern to be able to use async/await everywhere

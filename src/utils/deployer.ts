@@ -22,6 +22,7 @@ import {
 import {Artifact} from 'hardhat/types';
 import {SignerWithAddress} from '@nomiclabs/hardhat-ethers/signers';
 import {makeTemplates} from './templates';
+import {Create2Deployer} from '../../typechain-types';
 
 export type Head<T extends unknown[]> = T extends [
   ...other: infer Head,
@@ -33,7 +34,7 @@ export type Head<T extends unknown[]> = T extends [
 export interface DeployOptions<T extends ContractFactory> {
   args?: Head<Parameters<T['deploy']>>;
   salt?: BigNumberish;
-  calls?: BytesLike[];
+  calls?: Create2Deployer.FunctionCallStruct[];
   overrides?: Overrides & {from?: string | Promise<string>};
 }
 
@@ -44,7 +45,7 @@ export interface CloneOptions {
 
 export interface DeployArtifactOptions {
   salt?: BigNumberish;
-  calls?: BytesLike[];
+  calls?: Create2Deployer.FunctionCallStruct[];
   overrides?: Overrides & {from?: string | Promise<string>};
 }
 

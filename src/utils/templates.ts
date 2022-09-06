@@ -14,7 +14,8 @@ import {
   TransparentUpgradeableProxy__factory,
   UpgradeableBeacon__factory,
 } from '../proxies';
-import {Empty__factory} from '../../typechain-types/factories/Empty__factory';
+import {Empty__factory} from '../../typechain-types/factories/contracts/Empty__factory';
+import {Owner__factory} from '../../typechain-types/factories/contracts/Owner__factory';
 import {
   defaultAbiCoder,
   hexConcat,
@@ -22,6 +23,7 @@ import {
   keccak256,
   toUtf8Bytes,
 } from 'ethers/lib/utils';
+import {Create2Deployer} from '../../typechain-types';
 
 export type FunctionName<T extends Contract> =
   keyof T['interface']['functions'];
@@ -39,8 +41,12 @@ export interface ProxyOptions<T extends Contract> {
   initializer?: FunctionCall<T> | FunctionName<T>;
 }
 
+const OWNER_ADDRESS = Deployer.factoryAddress(new Owner__factory());
+const EMPTY_ADDRESS = Deployer.factoryAddress(new Empty__factory());
+
 export function makeTemplates(deployer: Deployer) {
   const templates = {
+    ownerFactory: new Owner__factory(deployer.signer),
     proxyAdminFactory: new ProxyAdmin__factory(deployer.signer),
     beaconProxyFactory: new BeaconProxy__factory(deployer.signer),
     upgradeableBeaconFactory: new UpgradeableBeacon__factory(deployer.signer),
@@ -52,10 +58,21 @@ export function makeTemplates(deployer: Deployer) {
         salt: 0,
         overrides,
       }),
-    emptyAddress: Deployer.factoryAddress(new Empty__factory()),
+    emptyAddress: EMPTY_ADDRESS,
+    owner: async (overrides?: Overrides) =>
+      deployer.deploy(new Owner__factory(deployer.signer), {
+        salt: 0,
+        overrides,
+      }),
+    ownerAddress: OWNER_ADDRESS,
     proxyAdmin: async (overrides?: Overrides) => {
       return deployer.deploy(new ProxyAdmin__factory(deployer.signer), {
-        calls: [transferOwnership(deployer.signer.address)],
+        calls: [
+          ownableTransferOwnership(
+            templates.proxyAdminAddress,
+            deployer.signer.address
+          ),
+        ],
         salt: deployer.signer.address,
         overrides,
       });
@@ -79,8 +96,14 @@ export function makeTemplates(deployer: Deployer) {
       const proxy = (await deployer.deploy<ContractFactory>(
         new TransparentUpgradeableProxy__factory(deployer.signer),
         {
-          args: [empty.address, proxyAdmin.address, '0x'],
+          args: [empty.address, templates.ownerAddress, '0x'],
           salt: templates.proxySalt(id, salt),
+          calls: [
+            ownerTransferOwnership(
+              templates.transparentUpgradeableProxyAddress(id, salt),
+              templates.proxyAdminAddress
+            ),
+          ],
           overrides,
         }
       )) as T & {isExisting: boolean};
@@ -135,7 +158,7 @@ export function makeTemplates(deployer: Deployer) {
       return Deployer.factoryAddress(
         new TransparentUpgradeableProxy__factory(),
         {
-          args: [templates.emptyAddress, templates.proxyAdminAddress, '0x'],
+          args: [templates.emptyAddress, templates.ownerAddress, '0x'],
           salt: templates.proxySalt(id, salt),
         }
       );
@@ -171,7 +194,12 @@ export function makeTemplates(deployer: Deployer) {
         new UpgradeableBeacon__factory(deployer.signer),
         {
           args: [templates.emptyAddress],
-          calls: [transferOwnership(deployer.address)],
+          calls: [
+            ownableTransferOwnership(
+              templates.upgradeableBeaconAddress(id, salt),
+              deployer.address
+            ),
+          ],
           salt,
           overrides,
         }
@@ -216,9 +244,28 @@ function encodeFunctionCall<T extends Contract>(
   ]);
 }
 
-function transferOwnership(account: string) {
-  return ProxyAdmin__factory.createInterface().encodeFunctionData(
-    'transferOwnership',
-    [account]
-  );
+function ownableTransferOwnership(
+  target: string,
+  account: string
+): Create2Deployer.FunctionCallStruct {
+  return {
+    target,
+    data: ProxyAdmin__factory.createInterface().encodeFunctionData(
+      'transferOwnership',
+      [account]
+    ),
+  };
+}
+
+function ownerTransferOwnership(
+  target: string,
+  account: string
+): Create2Deployer.FunctionCallStruct {
+  return {
+    target: OWNER_ADDRESS,
+    data: Owner__factory.createInterface().encodeFunctionData(
+      'transferOwnership',
+      [target, account]
+    ),
+  };
 }
