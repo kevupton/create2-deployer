@@ -4643,10 +4643,10 @@ hardhat-gas-reporter@^1.0.8:
     eth-gas-reporter "^0.2.24"
     sha1 "^1.1.1"
 
-hardhat-package@^1.0.0-beta.8:
-  version "1.0.0-beta.8"
-  resolved "https://registry.yarnpkg.com/hardhat-package/-/hardhat-package-1.0.0-beta.8.tgz#443883420eab7628643d7ea1aadba9c0b8726289"
-  integrity sha512-NtQ9OJPq5rVwe6XD5T6HropJxvFPeAjAFWt1K/C40FqC2dYajwHhJOLApv9HSEANXl2kOAxqIy/fX01XJkY55w==
+hardhat-package@^1.0.0-beta.11:
+  version "1.0.0-beta.11"
+  resolved "https://registry.yarnpkg.com/hardhat-package/-/hardhat-package-1.0.0-beta.11.tgz#f69075730a7f743e0a9d82b29f22260dfe1fc6f7"
+  integrity sha512-lAllxnyIUVEh39hMZWp43loVkg6JwUTMj1RagiWt3MEGaQ0WB9d7s6QLHJNoXPr+8htdOJcyMBOfedQ0Sxk8Kg==
   dependencies:
     "@babel/core" "^7.18.13"
     "@babel/preset-env" "^7.18.10"
