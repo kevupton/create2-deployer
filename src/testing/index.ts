@@ -1,4 +1,4 @@
-import {CREATE2_DEPLOYER_ADDRESS} from '../utils';
+import {CREATE2_DEPLOYER_ADDRESS, Deployer} from '../utils';
 import {Create2Deployer__factory} from '../../typechain-types';
 import {task} from 'hardhat/config';
 import {TASK_TEST_SETUP_TEST_ENVIRONMENT} from 'hardhat/builtin-tasks/task-names';
@@ -16,6 +16,10 @@ task(TASK_TEST_SETUP_TEST_ENVIRONMENT).setAction(
       CREATE2_DEPLOYER_ADDRESS,
       bytecode,
     ]);
+
+    const deployer = new Deployer(signer);
+    await deployer.templates.empty();
+    await deployer.templates.owner();
 
     console.log('Create2 Deployer Setup');
   }
