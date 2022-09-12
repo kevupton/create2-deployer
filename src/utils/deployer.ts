@@ -64,11 +64,12 @@ export class Deployer {
   public readonly create2DeployerPromise = getCreate2Deployer(this.signer);
   public readonly address = CREATE2_DEPLOYER_ADDRESS;
 
-  public readonly templates = makeTemplates(this);
+  public readonly templates = makeTemplates(this, this.debugMode);
 
   constructor(
     public readonly signer: SignerWithAddress,
-    public readonly defaultSalt: BigNumberish = process.env.DEFAULT_SALT || '0'
+    public readonly defaultSalt: BigNumberish = process.env.DEFAULT_SALT || '0',
+    public readonly debugMode = false
   ) {
     if (!this.signer) {
       throw new Error('missing provider inside signer');

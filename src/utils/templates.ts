@@ -40,10 +40,11 @@ export interface ProxyOptions<T extends Contract> {
   initializer?: FunctionCall<T> | FunctionName<T>;
 }
 
-export function makeTemplates(deployer: Deployer) {
+export function makeTemplates(deployer: Deployer, debugMode = false) {
   const PLACEHOLDER_ADDRESS = Deployer.factoryAddress(
     new Placeholder__factory()
   );
+  debug('placeholder ' + PLACEHOLDER_ADDRESS);
 
   const templates = {
     placeholderFactory: new Placeholder__factory(deployer.signer),
@@ -90,11 +91,7 @@ export function makeTemplates(deployer: Deployer) {
       const proxy = (await deployer.deploy<ContractFactory>(
         templates.transparentUpgradeableProxyFactory,
         {
-          args: [
-            templates.placeholderAddress,
-            templates.placeholderAddress,
-            '0x',
-          ],
+          args: [PLACEHOLDER_ADDRESS, PLACEHOLDER_ADDRESS, '0x'],
           salt: templates.proxySalt(id, salt),
           calls: [
             changeAdmin(
@@ -111,12 +108,14 @@ export function makeTemplates(deployer: Deployer) {
       );
 
       let call: FunctionCall<T> | undefined;
-      if (initializer && currentImpl.eq(templates.placeholderAddress)) {
+      if (initializer && currentImpl.eq(PLACEHOLDER_ADDRESS)) {
+        debug('initializing proxy');
         call =
           typeof initializer !== 'object'
             ? {id: initializer, args: []}
             : initializer;
       } else if (upgradeCall && !currentImpl.eq(implementation.address)) {
+        debug('upgrading proxy');
         call =
           typeof upgradeCall !== 'object'
             ? {id: upgradeCall, args: []}
@@ -145,6 +144,7 @@ export function makeTemplates(deployer: Deployer) {
         return result;
       })();
 
+      debug('is existing ' + proxy.isExisting);
       Object.defineProperty(result, 'isExisting', {
         writable: false,
         value: proxy.isExisting,
@@ -269,5 +269,9 @@ export function makeTemplates(deployer: Deployer) {
         ]
       ),
     };
+  }
+
+  function debug(message: string) {
+    if (debugMode) console.debug(message);
   }
 }
