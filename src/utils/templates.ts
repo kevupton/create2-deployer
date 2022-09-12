@@ -52,14 +52,16 @@ export function makeTemplates(deployer: Deployer) {
     upgradeableBeaconFactory: new UpgradeableBeacon__factory(deployer.signer),
     transparentUpgradeableProxyFactory:
       new TransparentUpgradeableProxy__factory(deployer.signer),
+    erc1967ProxyFactory: new ERC1967Proxy__factory(deployer.signer),
+
     placeholder: async (overrides?: Overrides) =>
-      deployer.deploy(new Placeholder__factory(deployer.signer), {
+      deployer.deploy(templates.placeholderFactory, {
         salt: 0,
         overrides,
       }),
     placeholderAddress: PLACEHOLDER_ADDRESS,
     proxyAdmin: async (overrides?: Overrides) => {
-      return deployer.deploy(new ProxyAdmin__factory(deployer.signer), {
+      return deployer.deploy(templates.proxyAdminFactory, {
         calls: [
           transferOwnership(
             templates.proxyAdminAddress,
@@ -85,16 +87,19 @@ export function makeTemplates(deployer: Deployer) {
       }: ProxyOptions<T> = {}
     ) => {
       proxyAdmin = proxyAdmin ?? (await templates.proxyAdmin());
-      const empty = await templates.placeholder();
       const proxy = (await deployer.deploy<ContractFactory>(
-        new TransparentUpgradeableProxy__factory(deployer.signer),
+        templates.transparentUpgradeableProxyFactory,
         {
-          args: [empty.address, templates.placeholderAddress, '0x'],
+          args: [
+            templates.placeholderAddress,
+            templates.placeholderAddress,
+            '0x',
+          ],
           salt: templates.proxySalt(id, salt),
           calls: [
             changeAdmin(
               templates.transparentUpgradeableProxyAddress(id, salt),
-              templates.proxyAdminAddress
+              proxyAdmin.address
             ),
           ],
           overrides,
@@ -106,7 +111,7 @@ export function makeTemplates(deployer: Deployer) {
       );
 
       let call: FunctionCall<T> | undefined;
-      if (initializer && currentImpl.eq(empty.address)) {
+      if (initializer && currentImpl.eq(templates.placeholderAddress)) {
         call =
           typeof initializer !== 'object'
             ? {id: initializer, args: []}
@@ -149,13 +154,9 @@ export function makeTemplates(deployer: Deployer) {
     },
     transparentUpgradeableProxyAddress: (id: string, salt?: BigNumberish) => {
       return Deployer.factoryAddress(
-        new TransparentUpgradeableProxy__factory(),
+        templates.transparentUpgradeableProxyFactory,
         {
-          args: [
-            templates.placeholderAddress,
-            templates.placeholderAddress,
-            '0x',
-          ],
+          args: [PLACEHOLDER_ADDRESS, PLACEHOLDER_ADDRESS, '0x'],
           salt: templates.proxySalt(id, salt),
         }
       );
@@ -166,7 +167,7 @@ export function makeTemplates(deployer: Deployer) {
       salt?: BigNumberish,
       overrides?: Overrides
     ) => {
-      return deployer.deploy(new BeaconProxy__factory(deployer.signer), {
+      return deployer.deploy(templates.beaconProxyFactory, {
         args: [beaconAddress, '0x'],
         salt: templates.proxySalt(id, salt),
         overrides,
@@ -177,7 +178,7 @@ export function makeTemplates(deployer: Deployer) {
       id?: string,
       salt?: BigNumberish
     ) => {
-      return Deployer.factoryAddress(new BeaconProxy__factory(), {
+      return Deployer.factoryAddress(templates.beaconProxyFactory, {
         args: [beaconAddress, '0x'],
         salt,
       });
@@ -187,29 +188,26 @@ export function makeTemplates(deployer: Deployer) {
       salt?: BigNumberish,
       overrides?: Overrides
     ) => {
-      return await deployer.deploy(
-        new UpgradeableBeacon__factory(deployer.signer),
-        {
-          args: [templates.placeholderAddress],
-          calls: [
-            transferOwnership(
-              templates.upgradeableBeaconAddress(id, salt),
-              deployer.address
-            ),
-          ],
-          salt,
-          overrides,
-        }
-      );
+      return await deployer.deploy(templates.upgradeableBeaconFactory, {
+        args: [PLACEHOLDER_ADDRESS],
+        calls: [
+          transferOwnership(
+            templates.upgradeableBeaconAddress(id, salt),
+            deployer.address
+          ),
+        ],
+        salt,
+        overrides,
+      });
     },
     upgradeableBeaconAddress: (id?: string, salt?: BigNumberish) =>
-      Deployer.factoryAddress(new UpgradeableBeacon__factory(), {
+      Deployer.factoryAddress(templates.upgradeableBeaconFactory, {
         salt: templates.proxySalt(id, salt),
-        args: [templates.placeholderAddress],
+        args: [PLACEHOLDER_ADDRESS],
       }),
     erc1967Proxy: async (salt?: BigNumberish, overrides?: Overrides) => {
-      return await deployer.deploy(new ERC1967Proxy__factory(deployer.signer), {
-        args: [(await templates.placeholder()).address, '0x'],
+      return await deployer.deploy(templates.erc1967ProxyFactory, {
+        args: [PLACEHOLDER_ADDRESS, '0x'],
         salt,
         overrides,
       });
