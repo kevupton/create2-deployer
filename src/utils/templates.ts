@@ -122,18 +122,22 @@ export function makeTemplates(deployer: Deployer, debugMode = false) {
             : upgradeCall;
       }
 
-      const data = call
-        ? encodeFunctionCall<T>(implementation.interface, call)
-        : undefined;
+      debug('should upgrade? ' + currentImpl.eq(implementation.address));
+      if (!currentImpl.eq(implementation.address)) {
+        debug('upgrading implementation to ' + implementation.address);
+        const data = call
+          ? encodeFunctionCall<T>(implementation.interface, call)
+          : undefined;
 
-      const tx = data
-        ? await proxyAdmin.upgradeAndCall(
-            proxy.address,
-            implementation.address,
-            data
-          )
-        : await proxyAdmin.upgrade(proxy.address, implementation.address);
-      await tx.wait();
+        const tx = data
+          ? await proxyAdmin.upgradeAndCall(
+              proxy.address,
+              implementation.address,
+              data
+            )
+          : await proxyAdmin.upgrade(proxy.address, implementation.address);
+        await tx.wait();
+      }
 
       const result: T & {isExisting: boolean} = implementation.attach(
         proxy.address
