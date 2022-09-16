@@ -88,6 +88,8 @@ export function makeTemplates(deployer: Deployer, debugMode = false) {
       }: ProxyOptions<T> = {}
     ) => {
       proxyAdmin = proxyAdmin ?? (await templates.proxyAdmin());
+      await proxyAdmin.deployed();
+
       const proxy = (await deployer.deploy<ContractFactory>(
         templates.transparentUpgradeableProxyFactory,
         {
