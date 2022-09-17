@@ -88,7 +88,9 @@ export function makeTemplates(deployer: Deployer, debugMode = false) {
       }: ProxyOptions<T> = {}
     ) => {
       proxyAdmin = proxyAdmin ?? (await templates.proxyAdmin());
+
       await proxyAdmin.deployed();
+      await implementation.deployed();
 
       const proxy = (await deployer.deploy<ContractFactory>(
         templates.transparentUpgradeableProxyFactory,
@@ -104,6 +106,8 @@ export function makeTemplates(deployer: Deployer, debugMode = false) {
           overrides,
         }
       )) as T & {isExisting: boolean};
+
+      await proxy.deployed();
 
       const currentImpl = BigNumber.from(
         await proxyAdmin.getProxyImplementation(proxy.address)
@@ -144,17 +148,14 @@ export function makeTemplates(deployer: Deployer, debugMode = false) {
       const result: T & {isExisting: boolean} = implementation.attach(
         proxy.address
       ) as T & {isExisting: boolean};
-      result._deployedPromise = (async () => {
-        await proxy.deployed();
-        await implementation.deployed();
-        return result;
-      })();
 
       debug('is existing ' + proxy.isExisting);
       Object.defineProperty(result, 'isExisting', {
         writable: false,
         value: proxy.isExisting,
       });
+
+      result._deployedPromise = Promise.resolve(result);
 
       return result;
     },
