@@ -92,6 +92,7 @@ export function makeTemplates(deployer: Deployer, debugMode = false) {
       await proxyAdmin.deployed();
       await implementation.deployed();
 
+      debug('deploying proxy');
       const proxy = (await deployer.deploy<ContractFactory>(
         templates.transparentUpgradeableProxyFactory,
         {
