@@ -129,7 +129,7 @@ export function makeTemplates(deployer: Deployer, debugMode = false) {
             : upgradeCall;
       }
 
-      debug('should upgrade? ' + currentImpl.eq(implementation.address));
+      debug('should upgrade? ' + !currentImpl.eq(implementation.address));
       if (!currentImpl.eq(implementation.address)) {
         debug('upgrading implementation to ' + implementation.address);
         const data = call
