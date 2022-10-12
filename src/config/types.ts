@@ -1,4 +1,4 @@
-import {ContractFactory} from 'ethers';
+import {BigNumberish, ContractFactory} from 'ethers';
 import {DeployOptions, ProxyOptions} from '../utils';
 import {DeploymentRegistry} from '../../typechain-types';
 
@@ -19,14 +19,22 @@ export interface ContractConfiguration<
 > {
   id?: string;
   name: string;
-  roles?: Record<symbol, string>;
+  roles?: symbol[];
   requiredRoles?: (symbol | ((account: string) => Promise<void>))[];
   deployOptions?: DeployOptions<T>;
-  proxy?: {
-    id?: string;
-    type: 'TransparentUpgradeableProxy';
-    options?: ProxyOptions<Awaited<ReturnType<T['deploy']>>>;
-  };
+  proxy?:
+    | {
+        id?: string;
+        type: 'TransparentUpgradeableProxy';
+        options?: ProxyOptions<Awaited<ReturnType<T['deploy']>>>;
+      }
+    | {
+        id?: string;
+        type: 'UpgradeableBeacon';
+        options?: {
+          salt: BigNumberish;
+        };
+      };
   dependencies?: string[];
 
   deployed?(contracts: ContractSuite): Promise<void> | void;
@@ -67,10 +75,6 @@ export type ConfigOrConstructor<T extends ContractFactory = ContractFactory> =
     ) => Promise<ContractConfiguration<T>> | ContractConfiguration<T>);
 
 export interface DependencyConfig {
-  config: ConfigOrConstructor;
+  configOrConstructor: ConfigOrConstructor;
   deps: number[];
 }
-
-export type DeploymentInfoStruct = Parameters<
-  DeploymentRegistry['register']
->[2];

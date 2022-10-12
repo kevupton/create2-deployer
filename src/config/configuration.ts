@@ -7,7 +7,7 @@ export const Configuration = {
     config: ConfigOrConstructor<T>,
     deps: number[] = []
   ) {
-    return _dependencyConfigs.push({config, deps});
+    return _dependencyConfigs.push({configOrConstructor: config, deps});
   },
 
   load() {

@@ -3,14 +3,17 @@ import {
   DeploymentRegistry,
   DeploymentRegistry__factory,
 } from '../../typechain-types';
-import {BigNumberish, BytesLike} from 'ethers';
-import {DeploymentInfoStruct} from './types';
+import {BigNumberish, BytesLike, Contract} from 'ethers';
 import {keccak256, toUtf8Bytes} from 'ethers/lib/utils';
 import {wait} from '../utils/wait';
 import {DeploymentRegistryInterface} from '../../typechain-types/contracts/DeploymentRegistry';
 
 export class Registry {
-  public pendingCalls: BytesLike[] = [];
+  private pendingCalls: BytesLike[] = [];
+  private pendingDeployments: Record<
+    string,
+    DeploymentRegistry.DeploymentInfoStruct
+  > = {};
 
   private constructor(public readonly contract: DeploymentRegistry) {}
 
@@ -29,29 +32,22 @@ export class Registry {
     return '';
   };
 
-  // addCall2(
-  //   ...args: OverloadParameters<
-  //     DeploymentRegistryInterface['encodeFunctionData']
-  //   >
-  // ) {
-  //   this.pendingCalls.push(
-  //     (this.contract.interface as any).encodeFunctionData(...args)
-  //   );
-  // }
-
-  async executeCalls() {
-    if (!this.pendingCalls.length) {
-      return;
-    }
-
+  async sync() {
     const calls = this.pendingCalls;
     this.pendingCalls = [];
 
-    try {
-      await this.contract.multicall(calls).then(wait);
-    } catch (e) {
-      console.error('registry multicall failed', e);
-      this.pendingCalls = this.pendingCalls.concat(this.pendingCalls, calls);
+    Object.entries(this.pendingDeployments).forEach(([key, value]) => {
+      calls.push(
+        this.contract.interface.encodeFunctionData('register', [0, key, value])
+      );
+    });
+
+    if (this.pendingCalls.length) {
+      try {
+        await this.contract.multicall(calls).then(wait);
+      } catch (e) {
+        console.error('registry multicall failed', e);
+      }
     }
   }
 
@@ -73,7 +69,7 @@ export class Registry {
       const decoded = registry.interface.decodeFunctionResult(
         'deploymentInfo',
         result
-      ) as unknown as DeploymentInfoStruct;
+      ) as unknown as DeploymentRegistry.DeploymentInfoStruct;
       results[keys[i]] = {
         owner: decoded.owner,
         initialized: decoded.initialized,
@@ -85,7 +81,7 @@ export class Registry {
         initializeOptions: decoded.initializeOptions,
       };
       return results;
-    }, {} as Record<keyof T, DeploymentInfoStruct>);
+    }, {} as Record<keyof T, DeploymentRegistry.DeploymentInfoStruct>);
   }
 
   async registerOptions(...options: object[]) {
@@ -103,5 +99,32 @@ export class Registry {
       }
     }
     return optionIds;
+  }
+
+  async recordDeploymentInfo(contract: Contract, optionsId: BytesLike) {
+    if (!contract.deployTransaction) {
+      return;
+    }
+
+    const tx = await this.contract.provider.getTransaction(
+      contract.deployTransaction.hash
+    );
+
+    if (!tx.blockNumber) {
+      throw new Error('missing block number from deploy transaction');
+    }
+
+    const block = await this.contract.provider.getBlock(tx.blockNumber);
+
+    this.pendingDeployments[contract.address] = {
+      hash: contract.deployTransaction.hash,
+      block: block.number,
+      timestamp: block.timestamp,
+      owner: await this.contract.signer.getAddress(),
+      constructOptions: optionsId,
+      initializeOptions: '0x',
+      initialized: false,
+      lastConfigureOptions: '0x',
+    };
   }
 }
