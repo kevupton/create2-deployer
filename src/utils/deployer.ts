@@ -23,6 +23,7 @@ import {Artifact} from 'hardhat/types';
 import {SignerWithAddress} from '@nomiclabs/hardhat-ethers/signers';
 import {makeTemplates} from './templates';
 import {Create2Deployer} from '../../typechain-types/Create2Deployer';
+import {JsonRpcSigner} from '@ethersproject/providers';
 
 export type Head<T extends unknown[]> = T extends [
   ...other: infer Head,
@@ -66,7 +67,7 @@ export class Deployer {
 
   public readonly templates = makeTemplates(this, this.debugMode);
 
-  constructor(
+  private constructor(
     public readonly signer: SignerWithAddress,
     public readonly defaultSalt: BigNumberish = process.env.DEFAULT_SALT || '0',
     public readonly debugMode = false
@@ -258,5 +259,17 @@ export class Deployer {
       hexConcat(['0xff', CREATE2_DEPLOYER_ADDRESS, salt, keccak256(bytecode)])
     );
     return hexDataSlice(hash, 12, 32);
+  }
+
+  static async create(
+    signer: JsonRpcSigner,
+    defaultSalt?: BigNumberish,
+    debugMode?: boolean
+  ) {
+    return new Deployer(
+      await SignerWithAddress.create(signer),
+      defaultSalt,
+      debugMode
+    );
   }
 }

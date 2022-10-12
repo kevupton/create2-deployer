@@ -278,8 +278,4 @@ export function makeTemplates(deployer: Deployer, debugMode = false) {
       ),
     };
   }
-
-  function debug(message: string) {
-    if (debugMode) console.debug(message);
-  }
 }
