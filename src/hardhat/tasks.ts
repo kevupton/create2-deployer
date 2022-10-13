@@ -32,8 +32,6 @@ task(TASK_COMPILE).setAction(async (taskArgs, hre, runSuper) => {
     contracts = await hre.environment.addresses;
     prevHash = currentHash;
     currentHash = await hre.run(TASK_COMPUTE_HASH, {contracts});
-
-    console.log(currentHash, prevHash);
   } while (currentHash !== prevHash);
 
   await hre.run(TASK_SAVE_CONTRACTS, {
