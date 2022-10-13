@@ -368,9 +368,6 @@ export class Environment {
     ]);
 
     const deploymentInfo = await registry.deploymentInfo(addresses);
-    debug('deployment info', deploymentInfo);
-    console.log(deploymentInfo);
-
     const constructorId = await registry.registerOptions(
       this.hre.config.environment.constructorOptions
     );

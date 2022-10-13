@@ -2,7 +2,7 @@ import {
   DeploymentRegistry,
   DeploymentRegistry__factory,
 } from '../../typechain-types';
-import {BytesLike, Contract} from 'ethers';
+import {BytesLike, constants, Contract} from 'ethers';
 import {keccak256, toUtf8Bytes} from 'ethers/lib/utils';
 import {wait} from '../utils';
 import {Deployer} from '../deployer';
@@ -168,9 +168,9 @@ export class Registry {
       timestamp: block.timestamp,
       owner: await this.contract.signer.getAddress(),
       constructOptions: optionsId,
-      initializeOptions: '0x',
+      initializeOptions: constants.HashZero,
       initialized: false,
-      lastConfigureOptions: '0x',
+      lastConfigureOptions: constants.HashZero,
     };
   }
 }
