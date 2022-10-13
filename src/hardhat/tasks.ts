@@ -8,6 +8,7 @@ import {getAddress, hexConcat, keccak256} from 'ethers/lib/utils';
 import * as fs from 'fs';
 import {Create2Deployer__factory} from '../../typechain-types';
 import {CREATE2_DEPLOYER_ADDRESS, Deployer} from '../deployer';
+import {debug} from '../utils';
 
 let contracts: Record<string, string> = {};
 
@@ -48,6 +49,9 @@ subtask(TASK_COMPILE_SOLIDITY_READ_FILE).setAction(
     const absolutePath: string = taskArgs.absolutePath;
 
     const config = hre.config.environment.variableMapping[absolutePath];
+    if (config && !contracts[config.id]) {
+      debug('cannot find id in contracts. id: ', config.id);
+    }
     if (config && contracts[config.id]) {
       const regex = new RegExp(
         `(${config.variable}\\s*=\\s*(?:[a-zA-Z_][a-zA-Z_0-9]*\\()?)0x[0-9a-fA-F]{0,64}((?:\\))?\\s*;)`,
