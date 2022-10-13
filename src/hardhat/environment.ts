@@ -84,31 +84,30 @@ export class Environment {
   ): Promise<ContractConfigurationWithId> {
     let newConfig = this._parsedConfigs.get(configOrConstructor);
 
-    if (newConfig) {
-      return newConfig;
+    if (!newConfig) {
+      const config =
+        typeof configOrConstructor === 'function'
+          ? await configOrConstructor(options, addressSuite)
+          : configOrConstructor;
+
+      const id =
+        typeof config === 'string'
+          ? camel(config)
+          : config.id ?? camel(config.name);
+
+      if (addressSuite[id]) {
+        throw new Error('duplicate id ' + id);
+      }
+
+      newConfig = {
+        ...(typeof config === 'string' ? {name: config} : config),
+        id,
+      };
+
+      this._parsedConfigs.set(configOrConstructor, newConfig);
     }
 
-    const config =
-      typeof configOrConstructor === 'function'
-        ? await configOrConstructor(options, addressSuite)
-        : configOrConstructor;
-
-    const id =
-      typeof config === 'string'
-        ? camel(config)
-        : config.id ?? camel(config.name);
-
-    if (addressSuite[id]) {
-      throw new Error('duplicate id ' + id);
-    }
-
-    newConfig = {
-      ...(typeof config === 'string' ? {name: config} : config),
-      id,
-    };
-
-    addressSuite[id] = await this._getAddress(newConfig);
-    this._parsedConfigs.set(configOrConstructor, newConfig);
+    addressSuite[newConfig.id] = await this._getAddress(newConfig);
 
     return newConfig;
   }
@@ -370,6 +369,7 @@ export class Environment {
 
     const deploymentInfo = await registry.deploymentInfo(addresses);
     debug('deployment info', deploymentInfo);
+    console.log(deploymentInfo);
 
     const constructorId = await registry.registerOptions(
       this.hre.config.environment.constructorOptions
