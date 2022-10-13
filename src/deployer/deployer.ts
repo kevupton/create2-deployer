@@ -8,10 +8,6 @@ import {
   Overrides,
 } from 'ethers';
 import {
-  CREATE2_DEPLOYER_ADDRESS,
-  getCreate2Deployer,
-} from './get-create2-deployer';
-import {
   defaultAbiCoder,
   hexConcat,
   hexDataLength,
@@ -24,6 +20,7 @@ import {SignerWithAddress} from '@nomiclabs/hardhat-ethers/signers';
 import {makeTemplates} from './templates';
 import {Create2Deployer} from '../../typechain-types/contracts/Create2Deployer';
 import {JsonRpcSigner} from '@ethersproject/providers';
+import {Create2Deployer__factory} from '../../typechain-types';
 
 export type Head<T extends unknown[]> = T extends [
   ...other: infer Head,
@@ -60,9 +57,15 @@ export interface CreateTemplateOptions<T extends ContractFactory> {
   overrides?: Overrides & {from?: string | Promise<string>};
 }
 
+export const CREATE2_DEPLOYER_ADDRESS =
+  '0x07C25C3fcFb51B24Cf325769Ea2E381A309930E2';
+
 export class Deployer {
   public readonly provider = this.signer.provider!;
-  public readonly create2DeployerPromise = getCreate2Deployer(this.signer);
+  public readonly create2Deployer = Create2Deployer__factory.connect(
+    CREATE2_DEPLOYER_ADDRESS,
+    this.signer
+  );
   public readonly address = CREATE2_DEPLOYER_ADDRESS;
 
   public readonly templates = makeTemplates(this);
@@ -76,6 +79,19 @@ export class Deployer {
     }
   }
 
+  async validate(...args: any[]) {
+    if (!this.signer.provider) {
+      throw new Error('Signer missing provider');
+    }
+
+    const code = await this.signer.provider.getCode(CREATE2_DEPLOYER_ADDRESS);
+
+    if (!hexDataLength(code)) {
+      console.error('context', ...args);
+      throw new Error('Create2 deployer not deployed on this network yet.');
+    }
+  }
+
   async deploy<T extends ContractFactory>(
     factory: T,
     {
@@ -85,7 +101,7 @@ export class Deployer {
       overrides = {},
     }: DeployOptions<T> = {}
   ): Promise<ReturnType<T['attach']> & {isExisting: boolean}> {
-    const create2Deployer = await this.create2DeployerPromise;
+    await this.validate('deploy', factory);
     const contractAddress = Deployer.factoryAddress(factory, {args, salt});
     const code = await this.provider.getCode(contractAddress);
     const contract = factory
@@ -102,7 +118,12 @@ export class Deployer {
       });
     } else {
       const bytecode = Deployer.bytecode(factory, args);
-      const tx = await create2Deployer.deploy(bytecode, salt, calls, overrides);
+      const tx = await this.create2Deployer.deploy(
+        bytecode,
+        salt,
+        calls,
+        overrides
+      );
       Object.defineProperty(contract, 'deployTransaction', {
         writable: false,
         value: tx,
@@ -125,8 +146,8 @@ export class Deployer {
     deployed: Promise<string>;
     deployTransaction?: ContractTransaction;
   }> {
-    const create2Deployer = await this.create2DeployerPromise;
-    const contractAddress = await this.cloneAddress(target, salt);
+    await this.validate('clone', target);
+    const contractAddress = this.cloneAddress(target, salt);
     const code = await this.provider.getCode(contractAddress);
 
     if (hexDataLength(code)) {
@@ -136,7 +157,7 @@ export class Deployer {
         address: contractAddress,
       };
     } else {
-      const tx = await create2Deployer.clone(target, salt, overrides);
+      const tx = await this.create2Deployer.clone(target, salt, overrides);
       return {
         isExisting: false,
         address: contractAddress,
@@ -151,16 +172,21 @@ export class Deployer {
     args: BytesLike = '0x',
     {salt = this.defaultSalt, calls = [], overrides = {}}: DeployArtifactOptions
   ): Promise<Contract> {
-    const create2Deployer = await this.create2DeployerPromise;
+    await this.validate('deployArtifact', artifact);
     const bytecode = hexConcat([artifact.bytecode, args]);
-    const contractAddress = await Deployer.deployAddress(bytecode, salt);
+    const contractAddress = Deployer.deployAddress(bytecode, salt);
     const code = await this.provider.getCode(contractAddress);
     const contract = new Contract(contractAddress, artifact.abi, this.signer);
 
     if (hexDataLength(code)) {
       contract._deployedPromise = Promise.resolve(contract);
     } else {
-      const tx = await create2Deployer.deploy(bytecode, salt, calls, overrides);
+      const tx = await this.create2Deployer.deploy(
+        bytecode,
+        salt,
+        calls,
+        overrides
+      );
       contract._deployedPromise = tx.wait().then(() => contract);
       Object.defineProperty(contract, 'deployTransaction', {
         writable: false,
@@ -189,12 +215,12 @@ export class Deployer {
     factory: T,
     {args, overrides = {}}: CreateTemplateOptions<T> = {}
   ) {
-    const create2Deployer = await this.create2DeployerPromise;
-    const templateId = await Deployer.templateId(factory, args);
-    const template = await create2Deployer.template(templateId);
+    await this.validate('deploy', factory);
+    const templateId = Deployer.templateId(factory, args);
+    const template = await this.create2Deployer.template(templateId);
 
     if (!hexDataLength(template)) {
-      await create2Deployer
+      await this.create2Deployer
         .createTemplate(Deployer.bytecode(factory, args), overrides)
         .then(tx => tx.wait());
     }

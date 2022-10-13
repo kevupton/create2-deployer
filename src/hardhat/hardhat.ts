@@ -5,9 +5,9 @@ import {ConfigureOptions, ConstructorOptions} from './types';
 
 export interface Create2Variable {
   file: string;
-  contract: string;
+  contract?: string;
   variable: string;
-  targetContract: string;
+  id: string;
 }
 
 export interface Create2Environment {
@@ -16,6 +16,7 @@ export interface Create2Environment {
   configureOptions: ConfigureOptions;
   variables?: Create2Variable[];
   outputPath?: string;
+  writeToFile?: boolean;
 }
 
 declare module 'hardhat/types/runtime' {
@@ -51,6 +52,7 @@ extendConfig((config, userConfig) => {
     }),
     variables,
     variableMapping,
+    writeToFile: userConfig.environment?.writeToFile || false,
     path: path.join(
       config.paths.root,
       userConfig.environment?.path || 'config'

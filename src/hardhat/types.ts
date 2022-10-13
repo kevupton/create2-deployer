@@ -67,6 +67,7 @@ export type AddressValues<T extends object> = {
 };
 
 export type ConfigOrConstructor<T extends ContractFactory = ContractFactory> =
+  | string
   | ContractConfiguration<T>
   | ((
       options: ConstructorOptions,
@@ -74,6 +75,6 @@ export type ConfigOrConstructor<T extends ContractFactory = ContractFactory> =
     ) => Promise<ContractConfiguration<T>> | ContractConfiguration<T>);
 
 export interface DependencyConfig {
-  configOrConstructor: ConfigOrConstructor;
-  deps: number[];
+  config: ConfigOrConstructor;
+  deps?: number[];
 }

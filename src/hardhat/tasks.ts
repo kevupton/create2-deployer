@@ -4,10 +4,8 @@ import {
   TASK_COMPILE_SOLIDITY_READ_FILE,
   TASK_TEST_SETUP_TEST_ENVIRONMENT,
 } from 'hardhat/builtin-tasks/task-names';
-import {camel} from 'case';
 import {getAddress, hexConcat, keccak256} from 'ethers/lib/utils';
 import * as fs from 'fs';
-import {run} from 'hardhat';
 import {Create2Deployer__factory} from '../../typechain-types';
 import {CREATE2_DEPLOYER_ADDRESS, Deployer} from '../deployer';
 
@@ -18,12 +16,12 @@ const TASK_SAVE_CONTRACTS = 'environment:save';
 const TASK_COMPUTE_HASH = 'environment:hash';
 
 task(TASK_COMPILE).setAction(async (taskArgs, hre, runSuper) => {
-  contracts = await run(TASK_LOAD_CONTRACTS, {
+  contracts = await hre.run(TASK_LOAD_CONTRACTS, {
     path: hre.config.environment.outputPath,
   });
 
-  let currentHash: string = await run(TASK_COMPUTE_HASH, {contracts});
-  const prevHash: string = currentHash;
+  let currentHash: string = await hre.run(TASK_COMPUTE_HASH, {contracts});
+  let prevHash: string;
   let result: unknown;
 
   do {
@@ -32,12 +30,13 @@ task(TASK_COMPILE).setAction(async (taskArgs, hre, runSuper) => {
 
     hre.environment.reload();
     contracts = await hre.environment.addresses;
-    currentHash = await run(TASK_COMPUTE_HASH, {contracts});
+    prevHash = currentHash;
+    currentHash = await hre.run(TASK_COMPUTE_HASH, {contracts});
 
     console.log(currentHash, prevHash);
   } while (currentHash !== prevHash);
 
-  await run(TASK_SAVE_CONTRACTS, {
+  await hre.run(TASK_SAVE_CONTRACTS, {
     contracts,
     path: hre.config.environment.outputPath,
   });
@@ -45,7 +44,6 @@ task(TASK_COMPILE).setAction(async (taskArgs, hre, runSuper) => {
   return result;
 });
 
-const ADDRESS_ZERO = '0x0000000000000000000000000000000000000000';
 subtask(TASK_COMPILE_SOLIDITY_READ_FILE).setAction(
   async (taskArgs, hre, runSuper): Promise<string> => {
     let result = await runSuper(taskArgs);
@@ -54,11 +52,28 @@ subtask(TASK_COMPILE_SOLIDITY_READ_FILE).setAction(
     const config = hre.config.environment.variableMapping[absolutePath];
     if (config) {
       const regex = new RegExp(
-        `(${config.variable}\\s*=\\s*(?:[a-zA-Z_][a-zA-Z_0-9]*\\()?)${ADDRESS_ZERO}((?:\\))?\\s*;)`,
+        `(${config.variable}\\s*=\\s*(?:[a-zA-Z_][a-zA-Z_0-9]*\\()?)0x[0-9a-fA-F]{0,64}((?:\\))?\\s*;)`,
         'g'
       );
-      const address = getAddress(contracts[camel(config.variable)]);
-      if (address) result = result.replace(regex, '$1' + address + '$2');
+      if (!contracts[config.id]) {
+        throw new Error(
+          'invalid config id in environment variables (' + config.id + ')'
+        );
+      }
+      const address = getAddress(contracts[config.id]);
+      if (!regex.test(result)) {
+        throw new Error(
+          'Cannot find variable named "' +
+            config.variable +
+            '" inside "' +
+            absolutePath +
+            '"'
+        );
+      }
+      result = result.replace(regex, '$1' + address + '$2');
+      if (hre.config.environment.writeToFile) {
+        fs.writeFileSync(absolutePath, result);
+      }
     }
 
     return result;
@@ -70,8 +85,7 @@ subtask(
   'Loads the contract addresses from file'
 ).setAction(({path}) => {
   try {
-    const file = fs.readFileSync(path, 'utf8');
-    return JSON.parse(file);
+    return JSON.parse(fs.readFileSync(path, 'utf8'));
   } catch (e) {
     return {};
   }
@@ -79,7 +93,7 @@ subtask(
 
 subtask(TASK_SAVE_CONTRACTS, 'Saves the contract addresses to file').setAction(
   async ({contracts, path}) => {
-    fs.writeFileSync(path, JSON.stringify(contracts));
+    fs.writeFileSync(path, JSON.stringify(contracts, undefined, 4));
   }
 );
 
@@ -88,13 +102,7 @@ subtask(
   'Creates a hash based on the contract addresses given'
 ).setAction(async ({contracts}, env) => {
   return keccak256(
-    hexConcat(
-      env.config.environment.variables
-        .map(val => {
-          return camel(val.targetContract);
-        })
-        .map(id => contracts[id])
-    )
+    hexConcat(env.config.environment.variables.map(val => contracts[val.id]))
   );
 });
 

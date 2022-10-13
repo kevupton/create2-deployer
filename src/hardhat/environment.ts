@@ -28,7 +28,6 @@ export class Environment {
     addressSuite: Record<string, string>;
     configs: ContractConfigurationWithId[];
   }>;
-  private _registry = Registry.from(this.deployer);
   private _factories = new Map<string, ContractFactory>();
 
   constructor(public readonly hre: HardhatRuntimeEnvironment) {
@@ -50,18 +49,18 @@ export class Environment {
 
   async upgrade() {
     const [registry, addresses] = await Promise.all([
-      this._registry,
+      Registry.from(this.deployer),
       this.addresses,
     ]);
 
     debug('address suite', addresses);
 
-    const contracts = await this._deployConfigurations();
+    const contracts = await this._deployConfigurations(registry);
     await this._grantRoles(contracts);
 
-    const passing = await this._initialize(contracts);
+    const passing = await this._initialize(contracts, registry);
     await this._prepareConfig(passing, contracts);
-    await this._configure(passing, contracts);
+    await this._configure(passing, contracts, registry);
 
     await registry.sync();
 
@@ -78,14 +77,17 @@ export class Environment {
         ? await configOrConstructor(options, addressSuite)
         : configOrConstructor;
 
-    const id = config.id ?? camel(config.name);
+    const id =
+      typeof config === 'string'
+        ? camel(config)
+        : config.id ?? camel(config.name);
 
     if (addressSuite[id]) {
       throw new Error('duplicate id ' + id);
     }
 
     const newConfig: ContractConfigurationWithId = {
-      ...config,
+      ...(typeof config === 'string' ? {name: config} : config),
       id,
     };
 
@@ -138,14 +140,9 @@ export class Environment {
       path.join(this.hre.config.environment.path, '*.config.ts')
     );
 
-    console.log(matches);
     // eslint-disable-next-line node/no-unsupported-features/es-syntax
     this._dependencies = Promise.all(matches.map(match => import(match))).then(
-      results =>
-        results.map(value => {
-          console.log(value);
-          return value.default;
-        })
+      results => results.map(value => value.default)
     );
 
     return this._dependencies;
@@ -165,15 +162,16 @@ export class Environment {
     const ids = new WeakMap<DependencyConfig, number>();
 
     dependencies.forEach((curConfig, i) => {
+      const deps = curConfig.deps || [];
       const curId = i + 1;
       const config = {
         dependers: configs[curId]?.dependers || [],
         id: curId,
-        remaining: curConfig.deps.concat(),
+        remaining: deps.concat(),
       };
       ids.set(curConfig, curId);
-      if (curConfig.deps.length > 0) {
-        curConfig.deps.forEach(depIndex => {
+      if (deps.length > 0) {
+        deps.forEach(depIndex => {
           configs[depIndex] = configs[depIndex] || {
             dependers: [],
             remaining: [],
@@ -261,10 +259,10 @@ export class Environment {
     const configs: ContractConfigurationWithId[] = [];
     const addressSuite: Record<string, string> = {};
 
-    for (const {configOrConstructor} of await this._loadDependencies()) {
+    for (const {config} of await this._loadDependencies()) {
       configs.push(
         await this._parseConfig(
-          configOrConstructor,
+          config,
           this.hre.config.environment.constructorOptions,
           addressSuite
         )
@@ -274,11 +272,10 @@ export class Environment {
     return {configs, addressSuite};
   }
 
-  private async _deployConfigurations() {
-    const [configs, deployer, registry] = await Promise.all([
+  private async _deployConfigurations(registry: Registry) {
+    const [configs, deployer] = await Promise.all([
       this.configs,
       this.deployer,
-      this._registry,
     ]);
     const contractSuite: Record<string, Contract> = {};
 
@@ -341,10 +338,12 @@ export class Environment {
     return contractSuite;
   }
 
-  private async _initialize(contracts: Record<string, Contract>) {
-    const [configs, registry, addresses] = await Promise.all([
+  private async _initialize(
+    contracts: Record<string, Contract>,
+    registry: Registry
+  ) {
+    const [configs, addresses] = await Promise.all([
       this.configs,
-      this._registry,
       this.addresses,
     ]);
 
@@ -434,12 +433,10 @@ export class Environment {
 
   private async _configure(
     passing: Record<string, boolean>,
-    contracts: Record<string, Contract>
+    contracts: Record<string, Contract>,
+    registry: Registry
   ) {
-    const [configs, registry] = await Promise.all([
-      this.configs,
-      this._registry,
-    ]);
+    const [configs] = await Promise.all([this.configs]);
 
     const configureId = await registry.registerOptions(
       this.hre.config.environment.configureOptions
