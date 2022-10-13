@@ -74,7 +74,7 @@ export type ConfigOrConstructor<T extends ContractFactory = ContractFactory> =
       contracts: AddressValues<ContractSuite>
     ) => Promise<ContractConfiguration<T>> | ContractConfiguration<T>);
 
-export interface DependencyConfig {
-  config: ConfigOrConstructor;
+export interface DependencyConfig<T extends ContractFactory = ContractFactory> {
+  config: ConfigOrConstructor<T>;
   deps?: number[];
 }
