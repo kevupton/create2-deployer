@@ -55,7 +55,7 @@ extendConfig((config, userConfig) => {
     writeToFile: userConfig.environment?.writeToFile || false,
     path: path.join(
       config.paths.root,
-      userConfig.environment?.path || 'config'
+      userConfig.environment?.path || 'configs'
     ),
     outputPath: path.join(
       config.paths.root,
