@@ -24,8 +24,10 @@ const config: HardhatUserConfig = {
   },
   package: {
     copy: [
+      {src: 'src/deployer', dest: 'deployer', exported: true},
       {src: 'src/utils', dest: 'utils', exported: true},
       {src: 'src/testing', dest: 'testing'},
+      {src: 'src/hardhat', dest: 'hardhat'},
       {
         src: 'src/proxies',
         dest: 'proxies',

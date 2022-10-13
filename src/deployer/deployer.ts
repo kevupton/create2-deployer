@@ -22,7 +22,7 @@ import {
 import {Artifact} from 'hardhat/types';
 import {SignerWithAddress} from '@nomiclabs/hardhat-ethers/signers';
 import {makeTemplates} from './templates';
-import {Create2Deployer} from '../../typechain-types/Create2Deployer';
+import {Create2Deployer} from '../../typechain-types/contracts/Create2Deployer';
 import {JsonRpcSigner} from '@ethersproject/providers';
 
 export type Head<T extends unknown[]> = T extends [

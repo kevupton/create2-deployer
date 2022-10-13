@@ -14,7 +14,7 @@ import {
   TransparentUpgradeableProxy__factory,
   UpgradeableBeacon__factory,
 } from '../proxies';
-import {Placeholder__factory} from '../../typechain-types/factories/Placeholder__factory';
+import {Placeholder__factory} from '../../typechain-types/factories/contracts/Placeholder__factory';
 import {
   defaultAbiCoder,
   hexConcat,
