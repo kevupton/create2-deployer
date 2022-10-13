@@ -23,6 +23,7 @@ import {
   toUtf8Bytes,
 } from 'ethers/lib/utils';
 import {Create2Deployer} from '../../typechain-types';
+import {debug} from './log';
 
 export type FunctionName<T extends Contract> =
   keyof T['interface']['functions'];
@@ -40,7 +41,7 @@ export interface ProxyOptions<T extends Contract> {
   initializer?: FunctionCall<T> | FunctionName<T>;
 }
 
-export function makeTemplates(deployer: Deployer, debugMode = false) {
+export function makeTemplates(deployer: Deployer) {
   const PLACEHOLDER_ADDRESS = Deployer.factoryAddress(
     new Placeholder__factory()
   );

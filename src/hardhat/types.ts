@@ -1,6 +1,5 @@
 import {BigNumberish, ContractFactory} from 'ethers';
-import {DeployOptions, ProxyOptions} from '../utils';
-import {DeploymentRegistry} from '../../typechain-types';
+import {Deployer, DeployOptions, ProxyOptions} from '../utils';
 
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface ConfigureOptions {}
@@ -19,7 +18,7 @@ export interface ContractConfiguration<
 > {
   id?: string;
   name: string;
-  roles?: symbol[];
+  roles?: Record<string, symbol>;
   requiredRoles?: (symbol | ((account: string) => Promise<void>))[];
   deployOptions?: DeployOptions<T>;
   proxy?:

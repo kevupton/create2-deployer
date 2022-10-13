@@ -3,10 +3,9 @@ import {
   DeploymentRegistry,
   DeploymentRegistry__factory,
 } from '../../typechain-types';
-import {BigNumberish, BytesLike, Contract} from 'ethers';
+import {BytesLike, Contract} from 'ethers';
 import {keccak256, toUtf8Bytes} from 'ethers/lib/utils';
 import {wait} from '../utils/wait';
-import {DeploymentRegistryInterface} from '../../typechain-types/contracts/DeploymentRegistry';
 
 export class Registry {
   private pendingCalls: BytesLike[] = [];
@@ -17,7 +16,8 @@ export class Registry {
 
   private constructor(public readonly contract: DeploymentRegistry) {}
 
-  static async from(deployer: Deployer) {
+  static async from(deployer: Deployer | Promise<Deployer>) {
+    deployer = await deployer;
     const registry = await deployer.deploy(
       new DeploymentRegistry__factory(deployer.signer)
     );
@@ -25,20 +25,13 @@ export class Registry {
     return new Registry(registry);
   }
 
-  addCall: DeploymentRegistryInterface['encodeFunctionData'] = (...args) => {
-    this.pendingCalls.push(
-      (this.contract.interface as any).encodeFunctionData(...args)
-    );
-    return '';
-  };
-
   async sync() {
     const calls = this.pendingCalls;
     this.pendingCalls = [];
 
     Object.entries(this.pendingDeployments).forEach(([key, value]) => {
       calls.push(
-        this.contract.interface.encodeFunctionData('register', [0, key, value])
+        this.contract.interface.encodeFunctionData('register', [key, value])
       );
     });
 
@@ -51,18 +44,12 @@ export class Registry {
     }
   }
 
-  async deploymentInfo<T extends Record<string, string>>(
-    networkId: BigNumberish,
-    suite: T
-  ) {
+  async deploymentInfo<T extends Record<string, string>>(suite: T) {
     const registry = await this.contract;
     const keys: Record<string, keyof T> = {};
     const calls: string[] = Object.entries(suite).map(([key, address], i) => {
       keys[i] = key;
-      return registry.interface.encodeFunctionData('deploymentInfo', [
-        networkId,
-        address,
-      ]);
+      return registry.interface.encodeFunctionData('deploymentInfo', [address]);
     });
     const infos = await registry.callStatic.multicall(calls);
     return infos.reduce((results, result, i) => {
@@ -84,24 +71,83 @@ export class Registry {
     }, {} as Record<keyof T, DeploymentRegistry.DeploymentInfoStruct>);
   }
 
-  async registerOptions(...options: object[]) {
+  async registerOptions(options: object) {
+    const registry = await this.contract;
+
+    const bytes = toUtf8Bytes(JSON.stringify(options));
+    const id = keccak256(bytes);
+
+    try {
+      await registry.submitOptions(bytes).then(wait);
+      console.log('submitted options');
+    } catch (e) {
+      console.log('options already submitted');
+    }
+
+    return id;
+  }
+
+  async registerOptionsBulk(...options: object[]) {
     const registry = await this.contract;
     const optionIds: string[] = [];
-    for (const option of options) {
-      const bytes = toUtf8Bytes(JSON.stringify(option));
-      optionIds.push(keccak256(bytes));
+    const calls: string[] = [];
 
-      try {
-        await registry.submitOptions(bytes).then(wait);
-        console.log('submitted options');
-      } catch (e) {
-        console.log('options already submitted');
+    const bytesArray = options.map(option =>
+      toUtf8Bytes(JSON.stringify(option))
+    );
+    const ids = bytesArray.map(bytes => keccak256(bytes));
+
+    const checks = await Promise.all(
+      ids.map(async id => {
+        return registry.options(id).catch(() => undefined);
+      })
+    );
+
+    for (const i in bytesArray) {
+      const bytes = bytesArray[i];
+      const id = ids[i];
+
+      if (!checks[i]) {
+        optionIds.push(id);
+        calls.push(
+          registry.interface.encodeFunctionData('submitOptions', [bytes])
+        );
       }
     }
+
+    await registry.multicall(calls);
+
     return optionIds;
   }
 
-  async recordDeploymentInfo(contract: Contract, optionsId: BytesLike) {
+  setInitialized(address: string, optionsId: BytesLike) {
+    if (this.pendingDeployments[address]) {
+      this.pendingDeployments[address].initialized = true;
+      this.pendingDeployments[address].initializeOptions = optionsId;
+    } else {
+      this.pendingCalls.push(
+        this.contract.interface.encodeFunctionData('initialized', [
+          address,
+          optionsId,
+        ])
+      );
+    }
+  }
+
+  setConfigured(address: string, optionsId: BytesLike) {
+    if (this.pendingDeployments[address]) {
+      this.pendingDeployments[address].lastConfigureOptions = optionsId;
+    } else {
+      this.pendingCalls.push(
+        this.contract.interface.encodeFunctionData('configured', [
+          address,
+          optionsId,
+        ])
+      );
+    }
+  }
+
+  async setDeploymentInfo(contract: Contract, optionsId: BytesLike) {
     if (!contract.deployTransaction) {
       return;
     }

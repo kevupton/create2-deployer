@@ -65,12 +65,11 @@ export class Deployer {
   public readonly create2DeployerPromise = getCreate2Deployer(this.signer);
   public readonly address = CREATE2_DEPLOYER_ADDRESS;
 
-  public readonly templates = makeTemplates(this, this.debugMode);
+  public readonly templates = makeTemplates(this);
 
-  private constructor(
+  public constructor(
     public readonly signer: SignerWithAddress,
-    public readonly defaultSalt: BigNumberish = process.env.DEFAULT_SALT || '0',
-    public readonly debugMode = false
+    public readonly defaultSalt: BigNumberish = process.env.DEFAULT_SALT || '0'
   ) {
     if (!this.signer) {
       throw new Error('missing provider inside signer');
@@ -210,10 +209,6 @@ export class Deployer {
     return keccak256(Deployer.bytecode(factory, args));
   }
 
-  static from(signer: SignerWithAddress, defaultSalt: BigNumberish) {
-    return new Deployer(signer, defaultSalt);
-  }
-
   static bytecode(factory: ContractFactory, args: unknown[] = []) {
     const abiEncodedArgs = args
       ? defaultAbiCoder.encode(
@@ -261,15 +256,7 @@ export class Deployer {
     return hexDataSlice(hash, 12, 32);
   }
 
-  static async create(
-    signer: JsonRpcSigner,
-    defaultSalt?: BigNumberish,
-    debugMode?: boolean
-  ) {
-    return new Deployer(
-      await SignerWithAddress.create(signer),
-      defaultSalt,
-      debugMode
-    );
+  static async from(signer: JsonRpcSigner, defaultSalt?: BigNumberish) {
+    return new Deployer(await SignerWithAddress.create(signer), defaultSalt);
   }
 }
