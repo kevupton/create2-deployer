@@ -21,14 +21,20 @@ declare module 'hardhat/types/config' {
   }
 
   export interface HardhatUserConfig {
-    environment: Create2Environment;
+    environment?: Create2Environment;
   }
 }
 
 extendConfig((config, userConfig) => {
   config.environment = {
-    ...userConfig.environment,
-    path: path.join(config.paths.root, userConfig.environment.path || 'config'),
+    ...(userConfig.environment || {
+      constructorOptions: {},
+      configureOptions: {},
+    }),
+    path: path.join(
+      config.paths.root,
+      userConfig.environment?.path || 'config'
+    ),
   };
 });
 

@@ -1,5 +1,5 @@
 import {BigNumberish, ContractFactory} from 'ethers';
-import {Deployer, DeployOptions, ProxyOptions} from '../utils';
+import {DeployOptions, ProxyOptions} from '../deployer';
 
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface ConfigureOptions {}
