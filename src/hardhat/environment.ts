@@ -378,17 +378,16 @@ export class Environment {
     const passing: Record<string, boolean> = {};
 
     for (const config of configs) {
-      const id = camel(config.name) as keyof ContractSuite;
       const contract = contracts[config.id];
-      passing[id] = true;
+      passing[config.id] = true;
 
       if (!contract) {
         console.error('missing contract for', config.name);
-        passing[id] = false;
+        passing[config.id] = false;
         continue;
       }
 
-      if (!deploymentInfo[id].initialized && config.initialize) {
+      if (!deploymentInfo[config.id].initialized && config.initialize) {
         try {
           console.log('initializing', config.name);
           await config.initialize(
@@ -413,7 +412,7 @@ export class Environment {
             }
           }
         } catch (e: any) {
-          passing[id] = false;
+          passing[config.id] = false;
           console.error('failed initializing', config.name, '-', e.message, e);
         }
       }
@@ -428,8 +427,7 @@ export class Environment {
   ) {
     const configs = await this.configs;
     for (const config of configs) {
-      const id = camel(config.name) as keyof ContractSuite;
-      if (passing[id] && config.prepareConfig) {
+      if (passing[config.id] && config.prepareConfig) {
         try {
           console.log('preparing config', config.name);
           await config.prepareConfig(
@@ -460,14 +458,13 @@ export class Environment {
     );
 
     for (const config of configs) {
-      const id = camel(config.name) as keyof ContractSuite;
       const contract = contracts[config.id];
 
       if (!contract) {
         console.error('missing contract for', config.name);
       }
 
-      if (passing[id] && config.configure && contract) {
+      if (passing[config.id] && config.configure && contract) {
         try {
           console.log('configuring', config.name);
           await config.configure(
