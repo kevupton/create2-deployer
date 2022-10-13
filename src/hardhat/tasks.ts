@@ -48,16 +48,11 @@ subtask(TASK_COMPILE_SOLIDITY_READ_FILE).setAction(
     const absolutePath: string = taskArgs.absolutePath;
 
     const config = hre.config.environment.variableMapping[absolutePath];
-    if (config) {
+    if (config && contracts[config.id]) {
       const regex = new RegExp(
         `(${config.variable}\\s*=\\s*(?:[a-zA-Z_][a-zA-Z_0-9]*\\()?)0x[0-9a-fA-F]{0,64}((?:\\))?\\s*;)`,
         'g'
       );
-      if (!contracts[config.id]) {
-        throw new Error(
-          'invalid config id in environment variables (' + config.id + ')'
-        );
-      }
       const address = getAddress(contracts[config.id]);
       if (!regex.test(result)) {
         throw new Error(
@@ -100,7 +95,11 @@ subtask(
   'Creates a hash based on the contract addresses given'
 ).setAction(async ({contracts}, env) => {
   return keccak256(
-    hexConcat(env.config.environment.variables.map(val => contracts[val.id]))
+    hexConcat(
+      env.config.environment.variables.map(val => {
+        return contracts[val.id] || '0x';
+      })
+    )
   );
 });
 
