@@ -29,6 +29,7 @@
     "@typechain/ethers-v5": "^10.1.0",
     "@typechain/hardhat": "^6.1.2",
     "@types/chai": "^4.2.0",
+    "@types/glob": "^8.0.0",
     "@types/mocha": "^9.1.0",
     "@types/node": ">=12.0.0",
     "chai": "^4.2.0",
@@ -45,6 +46,7 @@
   "dependencies": {
     "@openzeppelin/contracts": "^4.7.3",
     "@openzeppelin/upgrades-core": "^1.18.0",
+    "glob": "^8.0.3",
     "hardhat-package": "^1.0.0-beta.11"
   },
   "engines": {

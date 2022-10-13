@@ -1,21 +1,19 @@
-import {BytesLike, Contract, ContractFactory} from 'ethers';
+import {Contract, ContractFactory} from 'ethers';
 import {
-  AddressValues,
   ConfigOrConstructor,
-  ConfigureOptions,
   ConstructorOptions,
   ContractConfiguration,
   ContractSuite,
   DependencyConfig,
 } from './types';
 import {camel} from 'case';
-import {Deployer} from '../utils';
 import {Registry} from './registry';
-import {ethers} from 'hardhat';
 import {debug} from '../utils/log';
 import {RoleManager} from './role-manager';
 import {HardhatRuntimeEnvironment} from 'hardhat/types';
-import {DeploymentRegistry} from '../../typechain-types';
+import {glob} from 'glob';
+import path from 'path';
+import {Deployer} from '../deployer';
 
 export type ContractConfigurationWithId = ContractConfiguration & {id: string};
 
@@ -25,7 +23,6 @@ interface ContractMetadata {
 }
 
 export class Environment {
-  private readonly dependencyConfigs: DependencyConfig[] = [];
   public readonly deployer = (process.env.DEPLOYER
     ? this.hre.ethers.getSigner(process.env.DEPLOYER)
     : this.hre.ethers.getSigners().then(signers => signers[0])
@@ -45,16 +42,6 @@ export class Environment {
     this.ready = loaded.then(() => true);
     this.addresses = loaded.then(({addressSuite}) => addressSuite);
     this.configs = loaded.then(({configs}) => configs);
-  }
-
-  register<T extends ContractFactory = ContractFactory>(
-    configOrConstructor: ConfigOrConstructor<T>,
-    deps: number[] = []
-  ) {
-    return this.dependencyConfigs.push({
-      configOrConstructor: configOrConstructor,
-      deps,
-    });
   }
 
   async upgrade() {
@@ -95,12 +82,14 @@ export class Environment {
       throw new Error('duplicate id ' + id);
     }
 
-    addressSuite[id] = await this._getAddress(config);
-
-    return {
+    const newConfig: ContractConfigurationWithId = {
       ...config,
       id,
     };
+
+    addressSuite[id] = await this._getAddress(newConfig);
+
+    return newConfig;
   }
 
   private async _factory(name: string) {
@@ -114,7 +103,7 @@ export class Environment {
     return factory;
   }
 
-  private async _getAddress(config: ContractConfiguration) {
+  private async _getAddress(config: ContractConfigurationWithId) {
     const factory = await this._factory(config.name);
     const deployer = await this.deployer;
 
@@ -122,16 +111,14 @@ export class Environment {
       switch (config.proxy.type) {
         case 'TransparentUpgradeableProxy':
           return deployer.templates.transparentUpgradeableProxyAddress(
-            config.proxy.id || id,
+            config.proxy.id || config.id,
             config.proxy.options?.salt
           );
-          break;
         case 'UpgradeableBeacon':
           return deployer.templates.upgradeableBeaconAddress(
-            config.proxy.id || id,
+            config.proxy.id || config.id,
             config.proxy.options?.salt
           );
-          break;
       }
     }
 
@@ -140,9 +127,23 @@ export class Environment {
     });
   }
 
-  private _fetchDependencies() {}
+  private async _fetchDependencies(): Promise<DependencyConfig[]> {
+    const matches = glob.sync(
+      path.join(this.hre.config.environment.path, '*.config.ts')
+    );
 
-  private _loadDependencies() {
+    console.log(matches);
+    // eslint-disable-next-line node/no-unsupported-features/es-syntax
+    return (await Promise.all(matches.map(match => import(match)))).map(
+      value => {
+        console.log(value);
+        return value.default;
+      }
+    );
+  }
+
+  private async _loadDependencies() {
+    const dependencies = await this._fetchDependencies();
     const sortedConfigs: DependencyConfig[] = [];
 
     const configs: Record<
@@ -154,7 +155,7 @@ export class Environment {
     > = {};
     const ids = new WeakMap<DependencyConfig, number>();
 
-    this.dependencyConfigs.forEach((curConfig, i) => {
+    dependencies.forEach((curConfig, i) => {
       const curId = i + 1;
       const config = {
         dependers: configs[curId]?.dependers || [],
@@ -186,14 +187,14 @@ export class Environment {
         const index = dependerConfig.remaining.indexOf(curId);
         if (index >= 0) dependerConfig.remaining.splice(index, 1);
         if (dependerConfig.remaining.length === 0) {
-          sortedConfigs.push(this.dependencyConfigs[depender - 1]);
+          sortedConfigs.push(dependencies[depender - 1]);
         }
       });
 
       ids.delete(curDep);
     }
 
-    if (sortedConfigs.length !== this.dependencyConfigs.length) {
+    if (sortedConfigs.length !== dependencies.length) {
       throw new Error('Missing Dependencies');
     }
 
@@ -246,7 +247,7 @@ export class Environment {
     const configs: ContractConfigurationWithId[] = [];
     const addressSuite: Record<string, string> = {};
 
-    for (const {configOrConstructor} of this._loadDependencies()) {
+    for (const {configOrConstructor} of await this._loadDependencies()) {
       configs.push(
         await this._parseConfig(
           configOrConstructor,

@@ -1,4 +1,4 @@
-import {CREATE2_DEPLOYER_ADDRESS, Deployer} from '../utils';
+import {CREATE2_DEPLOYER_ADDRESS, Deployer} from '../deployer';
 import {Create2Deployer__factory} from '../../typechain-types';
 import {task} from 'hardhat/config';
 import {TASK_TEST_SETUP_TEST_ENVIRONMENT} from 'hardhat/builtin-tasks/task-names';

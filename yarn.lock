@@ -1736,6 +1736,14 @@
     "@types/minimatch" "*"
     "@types/node" "*"
 
+"@types/glob@^8.0.0":
+  version "8.0.0"
+  resolved "https://registry.yarnpkg.com/@types/glob/-/glob-8.0.0.tgz#321607e9cbaec54f687a0792b2d1d370739455d2"
+  integrity sha512-l6NQsDDyQUVeoTynNpC9uRvCUint/gSUXQA2euwmTuWGvPY5LSDUu6tkCtJB2SvGQlJQzLaKqcGZP4//7EDveA==
+  dependencies:
+    "@types/minimatch" "*"
+    "@types/node" "*"
+
 "@types/json-schema@^7.0.7":
   version "7.0.11"
   resolved "https://registry.yarnpkg.com/@types/json-schema/-/json-schema-7.0.11.tgz#d421b6c527a3037f7c84433fd2c4229e016863d3"
