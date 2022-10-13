@@ -5,6 +5,7 @@ import {
   ContractConfiguration,
   ContractSuite,
   DependencyConfig,
+  DetailedDependencies,
 } from './types';
 import {camel} from 'case';
 import {Registry} from './registry';
@@ -29,9 +30,13 @@ export class Environment {
     configs: ContractConfigurationWithId[];
   }>;
   private _factories = new Map<string, ContractFactory>();
+  private _parsedConfigs = new Map<
+    ConfigOrConstructor,
+    ContractConfigurationWithId
+  >();
 
   constructor(public readonly hre: HardhatRuntimeEnvironment) {
-    this._ready = this._loadConfigurations();
+    this._ready = this._loadConfigurations('address');
   }
 
   get addresses() {
@@ -43,8 +48,9 @@ export class Environment {
   }
 
   reload() {
+    this._parsedConfigs.clear();
     this._factories.clear();
-    this._ready = this._loadConfigurations();
+    this._ready = this._loadConfigurations('address');
   }
 
   async upgrade() {
@@ -55,11 +61,15 @@ export class Environment {
 
     debug('address suite', addresses);
 
+    this._ready = this._loadConfigurations('deploy');
     const contracts = await this._deployConfigurations(registry);
     await this._grantRoles(contracts);
 
+    this._ready = this._loadConfigurations('initialize');
     const passing = await this._initialize(contracts, registry);
     await this._prepareConfig(passing, contracts);
+
+    this._ready = this._loadConfigurations('configure');
     await this._configure(passing, contracts, registry);
 
     await registry.sync();
@@ -72,6 +82,12 @@ export class Environment {
     options: ConstructorOptions,
     addressSuite: Record<string, string>
   ): Promise<ContractConfigurationWithId> {
+    let newConfig = this._parsedConfigs.get(configOrConstructor);
+
+    if (newConfig) {
+      return newConfig;
+    }
+
     const config =
       typeof configOrConstructor === 'function'
         ? await configOrConstructor(options, addressSuite)
@@ -86,12 +102,13 @@ export class Environment {
       throw new Error('duplicate id ' + id);
     }
 
-    const newConfig: ContractConfigurationWithId = {
+    newConfig = {
       ...(typeof config === 'string' ? {name: config} : config),
       id,
     };
 
     addressSuite[id] = await this._getAddress(newConfig);
+    this._parsedConfigs.set(configOrConstructor, newConfig);
 
     return newConfig;
   }
@@ -148,9 +165,21 @@ export class Environment {
     return this._dependencies;
   }
 
-  private async _loadDependencies() {
+  private async _loadDependencies(key?: keyof DetailedDependencies) {
     const dependencies = await this._fetchDependencies();
     const sortedConfigs: DependencyConfig[] = [];
+
+    const getDeps = (config: DependencyConfig) => {
+      if (Array.isArray(config.deps)) {
+        return config.deps;
+      }
+
+      if (key !== undefined && config.deps?.[key]) {
+        return config.deps[key]!;
+      }
+
+      return config.deps?.default || [];
+    };
 
     const configs = new WeakMap<
       DependencyConfig,
@@ -158,7 +187,7 @@ export class Environment {
     >();
 
     dependencies.forEach(curConfig => {
-      const deps = curConfig.deps || [];
+      const deps = getDeps(curConfig);
       const config = {
         dependers: configs.get(curConfig)?.dependers || [],
         remaining: deps.concat(),
@@ -248,11 +277,11 @@ export class Environment {
     }
   }
 
-  private async _loadConfigurations() {
+  private async _loadConfigurations(key?: keyof DetailedDependencies) {
     const configs: ContractConfigurationWithId[] = [];
     const addressSuite: Record<string, string> = {};
 
-    for (const {config} of await this._loadDependencies()) {
+    for (const {config} of await this._loadDependencies(key)) {
       configs.push(
         await this._parseConfig(
           config,
@@ -266,11 +295,12 @@ export class Environment {
   }
 
   private async _deployConfigurations(registry: Registry) {
-    const [configs, deployer] = await Promise.all([
+    const [configs, deployer, addresses] = await Promise.all([
       this.configs,
       this.deployer,
+      this.addresses,
     ]);
-    const contractSuite: Record<string, Contract> = {};
+    const contracts: Record<string, Contract> = {};
 
     const constructorId = await registry.registerOptions(
       this.hre.config.environment.constructorOptions
@@ -304,7 +334,18 @@ export class Environment {
           }
         }
 
-        contractSuite[config.id] = contract;
+        contracts[config.id] = contract;
+
+        try {
+          await config.deployed?.(contracts);
+        } catch (e: any) {
+          console.error(
+            'event handler "deployed" failed for',
+            config.name,
+            ' - ',
+            e.message
+          );
+        }
       } catch (e: unknown) {
         console.error(
           'failed to deploy',
@@ -315,20 +356,7 @@ export class Environment {
       }
     }
 
-    for (const config of configs) {
-      try {
-        await config.deployed?.(contractSuite);
-      } catch (e: any) {
-        console.error(
-          'event handler "deployed" failed for',
-          config.name,
-          ' - ',
-          e.message
-        );
-      }
-    }
-
-    return contractSuite;
+    return contracts;
   }
 
   private async _initialize(
@@ -347,7 +375,6 @@ export class Environment {
       this.hre.config.environment.constructorOptions
     );
 
-    const initialized: ContractConfigurationWithId[] = [];
     const passing: Record<string, boolean> = {};
 
     for (const config of configs) {
@@ -371,26 +398,23 @@ export class Environment {
           );
 
           registry.setInitialized(contract.address, constructorId);
-          initialized.push(config);
+
+          if (config.initialized) {
+            try {
+              console.log('event initialized', config.name);
+              await config.initialized(contracts);
+            } catch (e: any) {
+              console.error(
+                'event "initialized" failed for',
+                config.name,
+                '-',
+                e.message
+              );
+            }
+          }
         } catch (e: any) {
           passing[id] = false;
           console.error('failed initializing', config.name, '-', e.message, e);
-        }
-      }
-    }
-
-    for (const config of initialized) {
-      if (config.initialized) {
-        try {
-          console.log('event initialized', config.name);
-          await config.initialized(contracts);
-        } catch (e: any) {
-          console.error(
-            'event "initialized" failed for',
-            config.name,
-            '-',
-            e.message
-          );
         }
       }
     }
@@ -435,8 +459,6 @@ export class Environment {
       this.hre.config.environment.configureOptions
     );
 
-    const configured: ContractConfigurationWithId[] = [];
-
     for (const config of configs) {
       const id = camel(config.name) as keyof ContractSuite;
       const contract = contracts[config.id];
@@ -453,26 +475,22 @@ export class Environment {
             this.hre.config.environment.configureOptions,
             this.hre.config.environment.constructorOptions
           );
-          configured.push(config);
           registry.setConfigured(contract.address, configureId);
+          if (config.configured) {
+            try {
+              console.log('event configured', config.name);
+              await config.configured(contracts);
+            } catch (e: any) {
+              console.error(
+                'event "configured" failed for',
+                config.name,
+                ' - ',
+                e.message
+              );
+            }
+          }
         } catch (e: any) {
           console.error('configure failed for', config.name, ' - ', e.message);
-        }
-      }
-    }
-
-    for (const config of configured) {
-      if (config.configured) {
-        try {
-          console.log('event configured', config.name);
-          await config.configured(contracts);
-        } catch (e: any) {
-          console.error(
-            'event "configured" failed for',
-            config.name,
-            ' - ',
-            e.message
-          );
         }
       }
     }

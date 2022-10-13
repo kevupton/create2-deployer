@@ -74,7 +74,15 @@ export type ConfigOrConstructor<T extends ContractFactory = ContractFactory> =
       contracts: AddressValues<ContractSuite>
     ) => Promise<ContractConfiguration<T>> | ContractConfiguration<T>);
 
+export interface DetailedDependencies {
+  default?: DependencyConfig[];
+  deploy?: DependencyConfig[];
+  initialize?: DependencyConfig[];
+  configure?: DependencyConfig[];
+  address?: DependencyConfig[];
+}
+
 export interface DependencyConfig<T extends ContractFactory = ContractFactory> {
   config: ConfigOrConstructor<T>;
-  deps?: DependencyConfig[];
+  deps?: DependencyConfig[] | DetailedDependencies;
 }
