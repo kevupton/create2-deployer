@@ -281,13 +281,17 @@ export class Environment {
     const addressSuite: Record<string, string> = {};
 
     for (const {config} of await this._loadDependencies(key)) {
-      configs.push(
-        await this._parseConfig(
-          config,
-          this.hre.config.environment.constructorOptions,
-          addressSuite
-        )
-      );
+      try {
+        configs.push(
+          await this._parseConfig(
+            config,
+            this.hre.config.environment.constructorOptions,
+            addressSuite
+          )
+        );
+      } catch (e: any) {
+        debug('failed to parse config: ', e.message);
+      }
     }
 
     return {configs, addressSuite};
