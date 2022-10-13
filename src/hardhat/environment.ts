@@ -152,53 +152,46 @@ export class Environment {
     const dependencies = await this._fetchDependencies();
     const sortedConfigs: DependencyConfig[] = [];
 
-    const configs: Record<
-      number,
-      {
-        remaining: number[];
-        dependers: number[];
-      }
-    > = {};
-    const ids = new WeakMap<DependencyConfig, number>();
+    const configs = new WeakMap<
+      DependencyConfig,
+      {remaining: DependencyConfig[]; dependers: DependencyConfig[]}
+    >();
 
-    dependencies.forEach((curConfig, i) => {
+    dependencies.forEach(curConfig => {
       const deps = curConfig.deps || [];
-      const curId = i + 1;
       const config = {
-        dependers: configs[curId]?.dependers || [],
-        id: curId,
+        dependers: configs.get(curConfig)?.dependers || [],
         remaining: deps.concat(),
       };
-      ids.set(curConfig, curId);
       if (deps.length > 0) {
-        deps.forEach(depIndex => {
-          configs[depIndex] = configs[depIndex] || {
-            dependers: [],
-            remaining: [],
-          };
-          configs[depIndex].dependers.push(curId);
+        deps.forEach(dep => {
+          configs.set(
+            dep,
+            configs.get(dep) || {
+              dependers: [],
+              remaining: [],
+            }
+          );
+          configs.get(dep)!.dependers.push(curConfig);
         });
       } else {
         sortedConfigs.push(curConfig);
       }
-      configs[curId] = config;
+      configs.set(curConfig, config);
     });
 
     for (let i = 0; i < sortedConfigs.length; i++) {
       const curDep = sortedConfigs[i];
-      const curId = ids.get(curDep)!;
-      const config = configs[curId];
+      const config = configs.get(curDep)!;
 
       config.dependers.forEach(depender => {
-        const dependerConfig = configs[depender];
-        const index = dependerConfig.remaining.indexOf(curId);
+        const dependerConfig = configs.get(depender)!;
+        const index = dependerConfig.remaining.indexOf(curDep);
         if (index >= 0) dependerConfig.remaining.splice(index, 1);
         if (dependerConfig.remaining.length === 0) {
-          sortedConfigs.push(dependencies[depender - 1]);
+          sortedConfigs.push(depender);
         }
       });
-
-      ids.delete(curDep);
     }
 
     if (sortedConfigs.length !== dependencies.length) {

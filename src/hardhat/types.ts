@@ -76,5 +76,5 @@ export type ConfigOrConstructor<T extends ContractFactory = ContractFactory> =
 
 export interface DependencyConfig<T extends ContractFactory = ContractFactory> {
   config: ConfigOrConstructor<T>;
-  deps?: number[];
+  deps?: DependencyConfig[];
 }
