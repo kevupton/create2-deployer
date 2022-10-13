@@ -3,10 +3,19 @@ import path from 'path';
 import {Environment} from './environment';
 import {ConfigureOptions, ConstructorOptions} from './types';
 
+export interface Create2Variable {
+  file: string;
+  contract: string;
+  variable: string;
+  targetContract: string;
+}
+
 export interface Create2Environment {
   path?: string;
   constructorOptions: ConstructorOptions;
   configureOptions: ConfigureOptions;
+  variables?: Create2Variable[];
+  outputPath?: string;
 }
 
 declare module 'hardhat/types/runtime' {
@@ -17,7 +26,9 @@ declare module 'hardhat/types/runtime' {
 
 declare module 'hardhat/types/config' {
   export interface HardhatConfig {
-    environment: Required<Create2Environment>;
+    environment: Required<Create2Environment> & {
+      variableMapping: Record<string, Create2Variable>;
+    };
   }
 
   export interface HardhatUserConfig {
@@ -26,14 +37,27 @@ declare module 'hardhat/types/config' {
 }
 
 extendConfig((config, userConfig) => {
+  const variableMapping: Record<string, Create2Variable> = {};
+  const variables = userConfig.environment?.variables || [];
+
+  variables.forEach(variable => {
+    variableMapping[path.join(config.paths.sources, variable.file)] = variable;
+  });
+
   config.environment = {
     ...(userConfig.environment || {
       constructorOptions: {},
       configureOptions: {},
     }),
+    variables,
+    variableMapping,
     path: path.join(
       config.paths.root,
       userConfig.environment?.path || 'config'
+    ),
+    outputPath: path.join(
+      config.paths.root,
+      userConfig.environment?.outputPath || 'contracts.json'
     ),
   };
 });

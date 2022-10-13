@@ -23,7 +23,7 @@ import {
   toUtf8Bytes,
 } from 'ethers/lib/utils';
 import {Create2Deployer} from '../../typechain-types';
-import {debug} from '../utils/log';
+import {debug} from '../utils';
 
 export type FunctionName<T extends Contract> =
   keyof T['interface']['functions'];

@@ -1,11 +1,11 @@
-import {Deployer} from '../utils';
 import {
   DeploymentRegistry,
   DeploymentRegistry__factory,
 } from '../../typechain-types';
 import {BytesLike, Contract} from 'ethers';
 import {keccak256, toUtf8Bytes} from 'ethers/lib/utils';
-import {wait} from '../utils/wait';
+import {wait} from '../utils';
+import {Deployer} from '../deployer';
 
 export class Registry {
   private pendingCalls: BytesLike[] = [];

@@ -8,7 +8,7 @@ import {
 } from './types';
 import {camel} from 'case';
 import {Registry} from './registry';
-import {debug} from '../utils/log';
+import {debug} from '../utils';
 import {RoleManager} from './role-manager';
 import {HardhatRuntimeEnvironment} from 'hardhat/types';
 import {glob} from 'glob';
@@ -17,44 +17,46 @@ import {Deployer} from '../deployer';
 
 export type ContractConfigurationWithId = ContractConfiguration & {id: string};
 
-interface ContractMetadata {
-  initialized: boolean;
-  canUpgrade: boolean;
-}
-
 export class Environment {
   public readonly deployer = (process.env.DEPLOYER
     ? this.hre.ethers.getSigner(process.env.DEPLOYER)
     : this.hre.ethers.getSigners().then(signers => signers[0])
   ).then(signer => new Deployer(signer));
-  public readonly registry = Registry.from(this.deployer);
-  public readonly roles = new RoleManager();
-  public readonly addresses: Promise<Record<string, string>>;
-  public readonly configs: Promise<ContractConfigurationWithId[]>;
-  public readonly ready: Promise<boolean>;
-  public readonly factories = new Map<string, ContractFactory>();
-  public readonly contracts = new Map<string, Contract>();
-  public readonly metadata: Record<string, ContractMetadata> = {};
+
+  private _dependencies: Promise<DependencyConfig[]> | undefined;
+  private _ready: Promise<{
+    addressSuite: Record<string, string>;
+    configs: ContractConfigurationWithId[];
+  }>;
+  private _registry = Registry.from(this.deployer);
+  private _factories = new Map<string, ContractFactory>();
 
   constructor(public readonly hre: HardhatRuntimeEnvironment) {
-    const loaded = this._loadConfigurations();
+    this._ready = this._loadConfigurations();
+  }
 
-    this.ready = loaded.then(() => true);
-    this.addresses = loaded.then(({addressSuite}) => addressSuite);
-    this.configs = loaded.then(({configs}) => configs);
+  get addresses() {
+    return this._ready.then(val => val.addressSuite);
+  }
+
+  get configs() {
+    return this._ready.then(val => val.configs);
+  }
+
+  reload() {
+    this._factories.clear();
+    this._ready = this._loadConfigurations();
   }
 
   async upgrade() {
     const [registry, addresses] = await Promise.all([
-      this.registry,
+      this._registry,
       this.addresses,
     ]);
 
     debug('address suite', addresses);
 
     const contracts = await this._deployConfigurations();
-
-    await this._registerRoles(contracts);
     await this._grantRoles(contracts);
 
     const passing = await this._initialize(contracts);
@@ -93,13 +95,13 @@ export class Environment {
   }
 
   private async _factory(name: string) {
-    let factory = this.factories.get(name);
+    let factory = this._factories.get(name);
     if (factory) {
       return factory;
     }
 
     factory = await this.hre.ethers.getContractFactory(name);
-    this.factories.set(name, factory);
+    this._factories.set(name, factory);
     return factory;
   }
 
@@ -128,18 +130,25 @@ export class Environment {
   }
 
   private async _fetchDependencies(): Promise<DependencyConfig[]> {
+    if (this._dependencies) {
+      return this._dependencies;
+    }
+
     const matches = glob.sync(
       path.join(this.hre.config.environment.path, '*.config.ts')
     );
 
     console.log(matches);
     // eslint-disable-next-line node/no-unsupported-features/es-syntax
-    return (await Promise.all(matches.map(match => import(match)))).map(
-      value => {
-        console.log(value);
-        return value.default;
-      }
+    this._dependencies = Promise.all(matches.map(match => import(match))).then(
+      results =>
+        results.map(value => {
+          console.log(value);
+          return value.default;
+        })
     );
+
+    return this._dependencies;
   }
 
   private async _loadDependencies() {
@@ -201,25 +210,30 @@ export class Environment {
     return sortedConfigs;
   }
 
-  private async _registerRoles(contractSuite: Record<string, Contract>) {
-    const configs = await this.configs;
+  private _createRoleManager(
+    configs: ContractConfigurationWithId[],
+    contracts: Record<string, Contract>
+  ) {
+    const roles = new RoleManager();
     for (const config of configs) {
-      const contract = contractSuite[config.id];
+      const contract = contracts[config.id];
       if (!contract) {
         debug('missing contract for ' + config.id);
       }
 
       Object.values(config.roles || {}).forEach(role => {
-        this.roles.register(role, contract);
+        roles.register(role, contract);
       });
     }
-    return this.roles;
+    return roles;
   }
 
-  private async _grantRoles(contractSuite: Record<string, Contract>) {
+  private async _grantRoles(contracts: Record<string, Contract>) {
     const configs = await this.configs;
+    const roles = await this._createRoleManager(configs, contracts);
+
     for (const config of configs) {
-      const contract = contractSuite[config.id];
+      const contract = contracts[config.id];
 
       if (!contract) {
         console.error('missing contract for', config.name);
@@ -230,7 +244,7 @@ export class Environment {
           console.log('granting-roles', config.name);
           for (const requiredRole of config.requiredRoles) {
             if (typeof requiredRole === 'symbol') {
-              await this.roles.grant(requiredRole, contract.address);
+              await roles.grant(requiredRole, contract.address);
             } else {
               await requiredRole(contract.address);
             }
@@ -264,7 +278,7 @@ export class Environment {
     const [configs, deployer, registry] = await Promise.all([
       this.configs,
       this.deployer,
-      this.registry,
+      this._registry,
     ]);
     const contractSuite: Record<string, Contract> = {};
 
@@ -330,7 +344,7 @@ export class Environment {
   private async _initialize(contracts: Record<string, Contract>) {
     const [configs, registry, addresses] = await Promise.all([
       this.configs,
-      this.registry,
+      this._registry,
       this.addresses,
     ]);
 
@@ -424,7 +438,7 @@ export class Environment {
   ) {
     const [configs, registry] = await Promise.all([
       this.configs,
-      this.registry,
+      this._registry,
     ]);
 
     const configureId = await registry.registerOptions(

@@ -1,7 +1,6 @@
 import {Contract} from 'ethers';
 import {keccak256, toUtf8Bytes} from 'ethers/lib/utils';
-import {wait} from '../utils/wait';
-import {debug} from '../utils/log';
+import {debug, wait} from '../utils';
 
 export class RoleManager {
   private readonly contracts: Record<symbol, Contract> = {};
