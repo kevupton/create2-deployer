@@ -19,7 +19,10 @@ export class Registry {
   static async from(deployer: Deployer | Promise<Deployer>) {
     deployer = await deployer;
     const registry = await deployer.deploy(
-      new DeploymentRegistry__factory(deployer.signer)
+      new DeploymentRegistry__factory(deployer.signer),
+      {
+        salt: 0,
+      }
     );
     await registry.deployed();
     return new Registry(registry);
@@ -35,7 +38,7 @@ export class Registry {
       );
     });
 
-    if (this.pendingCalls.length) {
+    if (calls.length) {
       try {
         await this.contract.multicall(calls).then(wait);
       } catch (e) {
@@ -149,7 +152,7 @@ export class Registry {
 
   async setDeploymentInfo(contract: Contract, optionsId: BytesLike) {
     if (!contract.deployTransaction) {
-      return;
+      throw new Error('missing deploy transaction');
     }
 
     const tx = await this.contract.provider.getTransaction(
