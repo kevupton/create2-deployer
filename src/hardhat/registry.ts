@@ -152,7 +152,7 @@ export class Registry {
 
   async setDeploymentInfo(contract: Contract, optionsId: BytesLike) {
     if (!contract.deployTransaction) {
-      throw new Error('missing deploy transaction');
+      return;
     }
 
     const tx = await this.contract.provider.getTransaction(
