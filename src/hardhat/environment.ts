@@ -157,9 +157,12 @@ export class Environment {
     );
 
     // eslint-disable-next-line node/no-unsupported-features/es-syntax
-    this._dependencies = Promise.all(matches.map(match => import(match))).then(
-      results => results.map(value => value.default)
-    );
+    this._dependencies = Promise.all(matches.map(match => import(match)))
+      .then(results => results.map(value => value.default))
+      .catch(e => {
+        debug('failed fetching dependencies', e.message);
+        return [];
+      });
 
     return this._dependencies;
   }
