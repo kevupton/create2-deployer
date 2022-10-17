@@ -21,6 +21,7 @@ import {makeTemplates} from './templates';
 import {Create2Deployer} from '../../typechain-types/contracts/Create2Deployer';
 import {JsonRpcSigner} from '@ethersproject/providers';
 import {Create2Deployer__factory} from '../../typechain-types';
+import {PromiseOrValue} from '../../typechain-types/common';
 
 export type Head<T extends unknown[]> = T extends [
   ...other: infer Head,
@@ -32,7 +33,7 @@ export type Head<T extends unknown[]> = T extends [
 export interface DeployOptions<T extends ContractFactory> {
   args?: Head<Parameters<T['deploy']>>;
   salt?: BigNumberish;
-  calls?: Create2Deployer.FunctionCallStruct[];
+  calls?: (Create2Deployer.FunctionCallStruct | PromiseOrValue<BytesLike>)[];
   overrides?: Overrides & {from?: string | Promise<string>};
 }
 
@@ -121,7 +122,7 @@ export class Deployer {
       const tx = await this.create2Deployer.deploy(
         bytecode,
         salt,
-        calls,
+        await Deployer.formatCalls(calls, contractAddress),
         overrides
       );
       Object.defineProperty(contract, 'deployTransaction', {
@@ -284,5 +285,24 @@ export class Deployer {
 
   static async from(signer: JsonRpcSigner, defaultSalt?: BigNumberish) {
     return new Deployer(await SignerWithAddress.create(signer), defaultSalt);
+  }
+
+  static async formatCalls(
+    calls: (Create2Deployer.FunctionCallStruct | PromiseOrValue<BytesLike>)[],
+    defaultTarget: string
+  ): Promise<Create2Deployer.FunctionCallStruct[]> {
+    return Promise.all(
+      calls.map(async (call): Promise<Create2Deployer.FunctionCallStruct> => {
+        call = await call;
+        if (typeof call === 'string' || 'length' in call) {
+          return {
+            target: defaultTarget,
+            data: call,
+          };
+        } else {
+          return call;
+        }
+      })
+    );
   }
 }
