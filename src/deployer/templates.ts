@@ -116,7 +116,10 @@ export function makeTemplates(deployer: Deployer) {
       );
 
       let call: FunctionCall<T> | undefined;
-      if (initializer && currentImpl.eq(PLACEHOLDER_ADDRESS)) {
+      if (
+        initializer &&
+        (currentImpl.eq(PLACEHOLDER_ADDRESS) || proxy.deployTransaction)
+      ) {
         debug('initializing proxy');
         call =
           typeof initializer !== 'object'
