@@ -98,7 +98,7 @@ export function makeTemplates(deployer: Deployer) {
         templates.transparentUpgradeableProxyFactory,
         {
           args: [PLACEHOLDER_ADDRESS, PLACEHOLDER_ADDRESS, '0x'],
-          salt: templates.proxySalt(id, salt),
+          salt: templates.proxySalt(id.toLowerCase(), salt),
           calls: [
             changeAdmin(
               templates.transparentUpgradeableProxyAddress(id, salt),
@@ -166,7 +166,7 @@ export function makeTemplates(deployer: Deployer) {
         templates.transparentUpgradeableProxyFactory,
         {
           args: [PLACEHOLDER_ADDRESS, PLACEHOLDER_ADDRESS, '0x'],
-          salt: templates.proxySalt(id, salt),
+          salt: templates.proxySalt(id.toLowerCase(), salt),
         }
       );
     },
