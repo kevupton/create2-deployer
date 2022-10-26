@@ -72,7 +72,11 @@ export class Environment {
     this._ready = this._loadConfigurations('configure');
     await this._configure(passing, contracts, registry);
 
-    await registry.sync();
+    try {
+      await registry.sync();
+    } catch (e) {
+      console.warn(e);
+    }
 
     return contracts as ContractSuite;
   }
