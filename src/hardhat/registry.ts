@@ -4,11 +4,17 @@ import {
 } from '../../typechain-types';
 import {BytesLike, constants, Contract} from 'ethers';
 import {keccak256, toUtf8Bytes} from 'ethers/lib/utils';
-import {wait} from '../utils';
+import {debug, wait} from '../utils';
 import {Deployer} from '../deployer';
 
+export interface PendingCall {
+  test: () => Promise<void>;
+  call: BytesLike;
+  context: any;
+}
+
 export class Registry {
-  private pendingCalls: BytesLike[] = [];
+  private pendingCalls: PendingCall[] = [];
   private pendingDeployments: Record<
     string,
     DeploymentRegistry.DeploymentInfoStruct
@@ -29,20 +35,42 @@ export class Registry {
   }
 
   async sync() {
-    const calls = this.pendingCalls;
+    const pendingCalls = this.pendingCalls;
     this.pendingCalls = [];
 
     Object.entries(this.pendingDeployments).forEach(([key, value]) => {
-      calls.push(
-        this.contract.interface.encodeFunctionData('register', [key, value])
-      );
+      pendingCalls.push({
+        test: async () => this.contract.callStatic.register(key, value),
+        call: this.contract.interface.encodeFunctionData('register', [
+          key,
+          value,
+        ]),
+        context: {
+          call: 'register',
+          args: [key, value],
+        },
+      });
     });
+
+    const calls = (
+      await Promise.all(
+        pendingCalls.map(async ({test, call, context}) => {
+          try {
+            await test();
+            return call;
+          } catch (e) {
+            console.warn('test failed', context, e);
+            return undefined;
+          }
+        })
+      )
+    ).filter((value): value is string => value !== undefined);
 
     if (calls.length) {
       try {
         await this.contract.multicall(calls).then(wait);
       } catch (e) {
-        console.error('registry multicall failed', e);
+        console.warn('registry multicall failed', e);
       }
     }
   }
@@ -128,12 +156,17 @@ export class Registry {
       this.pendingDeployments[address].initialized = true;
       this.pendingDeployments[address].initializeOptions = optionsId;
     } else {
-      this.pendingCalls.push(
-        this.contract.interface.encodeFunctionData('initialized', [
+      this.pendingCalls.push({
+        test: () => this.contract.callStatic.initialized(address, optionsId),
+        call: this.contract.interface.encodeFunctionData('initialized', [
           address,
           optionsId,
-        ])
-      );
+        ]),
+        context: {
+          call: 'initialized',
+          args: [address, optionsId],
+        },
+      });
     }
   }
 
@@ -141,16 +174,28 @@ export class Registry {
     if (this.pendingDeployments[address]) {
       this.pendingDeployments[address].lastConfigureOptions = optionsId;
     } else {
-      this.pendingCalls.push(
-        this.contract.interface.encodeFunctionData('configured', [
+      this.pendingCalls.push({
+        test: () => this.contract.callStatic.configured(address, optionsId),
+        call: this.contract.interface.encodeFunctionData('configured', [
           address,
           optionsId,
-        ])
-      );
+        ]),
+        context: {
+          call: 'configured',
+          args: [address, optionsId],
+        },
+      });
     }
   }
 
   async setDeploymentInfo(contract: Contract, optionsId: BytesLike) {
+    debug(
+      'contract',
+      contract.address,
+      'deploy transaction',
+      contract.deployTransaction?.hash
+    );
+
     if (!contract.deployTransaction) {
       return;
     }
