@@ -47,6 +47,10 @@ export class Environment {
     return this._ready.then(val => val.configs);
   }
 
+  get registry() {
+    return Registry.from(this.deployer);
+  }
+
   reload() {
     this._parsedConfigs.clear();
     this._factories.clear();
