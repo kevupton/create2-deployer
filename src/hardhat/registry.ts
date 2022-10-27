@@ -152,6 +152,7 @@ export class Registry {
   }
 
   setInitialized(address: string, optionsId: BytesLike) {
+    debug('initialized', address, optionsId);
     if (this.pendingDeployments[address]) {
       this.pendingDeployments[address].initialized = true;
       this.pendingDeployments[address].initializeOptions = optionsId;
@@ -171,6 +172,7 @@ export class Registry {
   }
 
   setConfigured(address: string, optionsId: BytesLike) {
+    debug('configured', address, optionsId);
     if (this.pendingDeployments[address]) {
       this.pendingDeployments[address].lastConfigureOptions = optionsId;
     } else {
