@@ -53,6 +53,11 @@ export class Environment {
     this._ready = this._loadConfigurations('address');
   }
 
+  async getDeploymentInfo<T extends Record<string, string>>(contracts: T) {
+    const registry = await Registry.from(this.deployer);
+    return registry.deploymentInfo(contracts);
+  }
+
   async upgrade() {
     const [registry, addresses] = await Promise.all([
       Registry.from(this.deployer),
@@ -320,6 +325,7 @@ export class Environment {
         let contract = await deployer.deploy(factory, config.deployOptions);
 
         await contract.deployed();
+
         await registry.setDeploymentInfo(contract, constructorId);
 
         if (config.proxy) {
@@ -337,7 +343,13 @@ export class Environment {
                 config.proxy.options?.salt
               );
               break;
+            default:
+              throw new Error(
+                'invalid proxy type "' + config.proxy['type'] + '"'
+              );
           }
+
+          await registry.setDeploymentInfo(contract, constructorId);
         }
 
         contracts[config.id] = contract;
