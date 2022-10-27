@@ -101,22 +101,16 @@ export class Deployer {
       salt = this.defaultSalt,
       overrides = {},
     }: DeployOptions<T> = {}
-  ): Promise<ReturnType<T['attach']> & {isExisting: boolean}> {
+  ): Promise<ReturnType<T['attach']>> {
     await this.validate('deploy', factory);
     const contractAddress = Deployer.factoryAddress(factory, {args, salt});
     const code = await this.provider.getCode(contractAddress);
     const contract = factory
       .connect(this.signer)
-      .attach(contractAddress) as ReturnType<T['attach']> & {
-      isExisting: boolean;
-    };
+      .attach(contractAddress) as ReturnType<T['attach']>;
 
     if (hexDataLength(code)) {
       contract._deployedPromise = Promise.resolve(contract);
-      Object.defineProperty(contract, 'isExisting', {
-        writable: false,
-        value: true,
-      });
     } else {
       const bytecode = Deployer.bytecode(factory, args);
       const tx = await this.create2Deployer.deploy(
@@ -129,10 +123,6 @@ export class Deployer {
         writable: false,
         value: tx,
       });
-      Object.defineProperty(contract, 'isExisting', {
-        writable: false,
-        value: false,
-      });
     }
 
     return contract;
@@ -143,7 +133,6 @@ export class Deployer {
     {salt = this.defaultSalt, overrides = {}}: CloneOptions = {}
   ): Promise<{
     address: string;
-    isExisting: boolean;
     deployed: Promise<string>;
     deployTransaction?: ContractTransaction;
   }> {
@@ -153,14 +142,12 @@ export class Deployer {
 
     if (hexDataLength(code)) {
       return {
-        isExisting: true,
         deployed: Promise.resolve(contractAddress),
         address: contractAddress,
       };
     } else {
       const tx = await this.create2Deployer.clone(target, salt, overrides);
       return {
-        isExisting: false,
         address: contractAddress,
         deployed: tx.wait().then(() => contractAddress),
         deployTransaction: tx,

@@ -107,7 +107,7 @@ export function makeTemplates(deployer: Deployer) {
           ],
           overrides,
         }
-      )) as T & {isExisting: boolean};
+      )) as T;
 
       await proxy.deployed();
 
@@ -150,17 +150,16 @@ export function makeTemplates(deployer: Deployer) {
         await tx.wait();
       }
 
-      const result: T & {isExisting: boolean} = implementation.attach(
-        proxy.address
-      ) as T & {isExisting: boolean};
+      const result: T = implementation.attach(proxy.address) as T;
 
-      debug('is existing ' + proxy.isExisting);
-      Object.defineProperty(result, 'isExisting', {
+      Object.defineProperty(result, 'deployTransaction', {
         writable: false,
-        value: proxy.isExisting,
+        value: proxy.deployTransaction,
       });
 
-      result._deployedPromise = Promise.resolve(result);
+      if (!proxy.deployTransaction) {
+        result._deployedPromise = Promise.resolve(result);
+      }
 
       return result;
     },
