@@ -358,15 +358,17 @@ export class Environment {
 
         contracts[config.id] = contract;
 
-        try {
-          await config.deployed?.(contracts);
-        } catch (e: any) {
-          console.error(
-            'event handler "deployed" failed for',
-            config.name,
-            ' - ',
-            e.message
-          );
+        if (contract.deployTransaction) {
+          try {
+            await config.deployed?.(contracts);
+          } catch (e: any) {
+            console.error(
+              'event handler "deployed" failed for',
+              config.name,
+              ' - ',
+              e.message
+            );
+          }
         }
       } catch (e: unknown) {
         console.error(
