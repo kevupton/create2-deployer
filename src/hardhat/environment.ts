@@ -1,4 +1,4 @@
-import {Contract, ContractFactory} from 'ethers';
+import {BigNumber, Contract, ContractFactory, ethers} from 'ethers';
 import {
   ConfigOrConstructor,
   ConstructorOptions,
@@ -6,15 +6,20 @@ import {
   ContractSuite,
   DependencyConfig,
   DetailedDependencies,
+  ProxyConfiguration,
 } from './types';
 import {camel} from 'case';
 import {Registry} from './registry';
-import {debug} from '../utils';
+import {debug, wait} from '../utils';
 import {RoleManager} from './role-manager';
 import {HardhatRuntimeEnvironment} from 'hardhat/types';
 import {glob} from 'glob';
 import path from 'path';
-import {Deployer} from '../deployer';
+import {Deployer, DeployOptions} from '../deployer';
+import {hexDataLength} from 'ethers/lib/utils';
+import Safe from '@gnosis.pm/safe-core-sdk';
+import EthersAdapter from '@gnosis.pm/safe-ethers-lib';
+import {BeaconProxy__factory, UpgradeableBeacon__factory} from '../proxies';
 
 export type ContractConfigurationWithId = ContractConfiguration & {id: string};
 
@@ -83,6 +88,8 @@ export class Environment {
 
     await registry.sync();
 
+    await this._finalize(passing, contracts);
+
     return contracts as ContractSuite;
   }
 
@@ -136,7 +143,7 @@ export class Environment {
     const factory = await this._factory(config.name);
     const deployer = await this.deployer;
 
-    if (config.proxy) {
+    if ('proxy' in config) {
       switch (config.proxy.type) {
         case 'TransparentUpgradeableProxy':
           return deployer.templates.transparentUpgradeableProxyAddress(
@@ -325,36 +332,12 @@ export class Environment {
       console.log('deploying', config.name);
 
       try {
-        const factory = await this._factory(config.name);
-        let contract = await deployer.deploy(factory, config.deployOptions);
-
-        await contract.deployed();
-
-        await registry.setDeploymentInfo(contract, constructorId);
-
-        if (config.proxy) {
-          switch (config.proxy.type) {
-            case 'TransparentUpgradeableProxy':
-              contract = await deployer.templates.transparentUpgradeableProxy(
-                config.proxy.id || config.id,
-                contract,
-                config.proxy.options
-              );
-              break;
-            case 'UpgradeableBeacon':
-              contract = await deployer.templates.upgradeableBeacon(
-                config.proxy.id || config.id,
-                config.proxy.options?.salt
-              );
-              break;
-            default:
-              throw new Error(
-                'invalid proxy type "' + config.proxy['type'] + '"'
-              );
-          }
-
-          await registry.setDeploymentInfo(contract, constructorId);
-        }
+        const contract = await this._deployContract(
+          config,
+          deployer,
+          registry,
+          constructorId
+        );
 
         contracts[config.id] = contract;
 
@@ -510,8 +493,206 @@ export class Environment {
           }
         } catch (e: any) {
           console.error('configure failed for', config.name, ' - ', e.message);
+          passing[config.id] = false;
         }
       }
+    }
+  }
+
+  private async _finalize(
+    passing: Record<string, boolean>,
+    contracts: Record<string, Contract>
+  ) {
+    const [configs] = await Promise.all([this.configs]);
+    const deployer = await this.deployer;
+
+    for (const config of configs) {
+      const contract = contracts[config.id];
+
+      if (!contract) {
+        console.error('missing contract for', config.name);
+        continue;
+      }
+
+      if (!passing[config.id]) continue;
+
+      if ('proxy' in config && config.proxy.owner) {
+        await this._transferOwnership(
+          deployer,
+          contract.address,
+          config.proxy.owner
+        );
+      }
+
+      if (config.finalized) {
+        try {
+          console.log('event finalized', config.name);
+          await config.finalized(contracts);
+        } catch (e: any) {
+          console.error(
+            'event finalized failed for',
+            config.name,
+            ' - ',
+            e.message
+          );
+        }
+      }
+    }
+  }
+
+  private async _deployContract(
+    config: ContractConfigurationWithId,
+    deployer: Deployer,
+    registry: Registry,
+    constructorId: string
+  ) {
+    const factory = await this._factory(config.name);
+    let contract: Contract;
+    let address: string;
+
+    if ('proxy' in config) {
+      address = this._getProxyAddress(deployer, config);
+
+      let options: DeployOptions | undefined;
+      if (typeof config.deployOptions === 'function') {
+        const {address: deploymentInfo} = await this.getDeploymentInfo({
+          address,
+        });
+        options = await config.deployOptions(deploymentInfo);
+      } else {
+        options = config.deployOptions;
+      }
+
+      contract = await deployer.deploy(factory, options);
+    } else {
+      contract = await deployer.deploy(factory, config.deployOptions);
+      address = contract.address;
+    }
+
+    await contract.deployed();
+    await registry.setDeploymentInfo(contract, constructorId);
+
+    if ('proxy' in config) {
+      if (config.proxy.type === 'TransparentUpgradeableProxy') {
+        let proxyAdmin = await deployer.templates.getProxyAdmin(address);
+        let safe: Safe | undefined;
+
+        if (proxyAdmin) {
+          const owner = await proxyAdmin.owner();
+          const code = await proxyAdmin.provider.getCode(owner);
+
+          // if there is a bytecode lets assume it is a proxy admin
+          if (hexDataLength(code) > 0) {
+            safe = await Safe.create({
+              ethAdapter: new EthersAdapter({
+                ethers,
+                signer: proxyAdmin.signer,
+              }),
+              safeAddress: owner,
+            });
+          }
+
+          proxyAdmin = proxyAdmin.connect(
+            await this.hre.ethers.getSigner(owner)
+          );
+        }
+
+        contract = await deployer.templates.transparentUpgradeableProxy(
+          config.proxy.id || config.id,
+          contract,
+          {
+            ...(config.proxy.options || {}),
+            multisig: safe,
+            proxyAdmin: proxyAdmin || config.proxy.options?.proxyAdmin,
+          }
+        );
+      } else if (config.proxy.type === 'UpgradeableBeacon') {
+        contract = await deployer.templates.upgradeableBeacon(
+          config.proxy.id || config.id,
+          config.proxy.options?.salt
+        );
+      } else {
+        throw new Error('invalid proxy type "' + config.proxy['type'] + '"');
+      }
+
+      await registry.setDeploymentInfo(contract, constructorId);
+    }
+
+    return contract;
+  }
+
+  private _getProxyAddress(
+    deployer: Deployer,
+    config: ProxyConfiguration<ContractFactory> & {id: string}
+  ) {
+    if (config.proxy.type === 'TransparentUpgradeableProxy') {
+      return deployer.templates.transparentUpgradeableProxyAddress(
+        config.proxy.id || config.id,
+        config.proxy.options?.salt
+      );
+    } else if (config.proxy.type === 'UpgradeableBeacon') {
+      return deployer.templates.upgradeableBeaconAddress(
+        config.proxy.id || config.id,
+        config.proxy.options?.salt
+      );
+    } else {
+      throw new Error('invalid proxy type "' + config.proxy['type'] + '"');
+    }
+  }
+
+  private async _transferOwnership(
+    deployer: Deployer,
+    address: string,
+    newOwner: string
+  ) {
+    let contract = UpgradeableBeacon__factory.connect(
+      (await deployer.templates.getProxyAdmin(address))?.address || address,
+      deployer.signer
+    );
+
+    const owner = await contract.owner();
+
+    if (BigNumber.from(owner).eq(newOwner)) {
+      return;
+    }
+
+    const code = await deployer.provider.getCode(owner);
+
+    let safe: Safe | undefined;
+    if (hexDataLength(code) > 0) {
+      safe = await Safe.create({
+        safeAddress: owner,
+        ethAdapter: new EthersAdapter({ethers, signer: deployer.signer}),
+      });
+    }
+
+    try {
+      if (safe) {
+        await safe.createTransaction({
+          safeTransactionData: {
+            data: contract.interface.encodeFunctionData('transferOwnership', [
+              newOwner,
+            ]),
+            to: contract.address,
+            value: '0',
+          },
+        });
+      } else {
+        if (!BigNumber.from(owner).eq(await deployer.signer.getAddress())) {
+          contract = contract.connect(await this.hre.ethers.getSigner(owner));
+        }
+
+        await contract.transferOwnership(newOwner).then(wait);
+      }
+    } catch (e: any) {
+      console.error(
+        'failed transfering ownership for ' +
+          address +
+          ' to ' +
+          newOwner +
+          '\n' +
+          e.message
+      );
     }
   }
 }

@@ -22,8 +22,11 @@ import {
   keccak256,
   toUtf8Bytes,
 } from 'ethers/lib/utils';
+import {Web3Provider} from '@ethersproject/providers';
 import {Create2Deployer} from '../../typechain-types';
 import {debug} from '../utils';
+import Safe from '@gnosis.pm/safe-core-sdk';
+import EthersAdapter from '@gnosis.pm/safe-ethers-lib';
 
 export type FunctionName<T extends Contract> =
   keyof T['interface']['functions'];
@@ -33,12 +36,13 @@ export interface FunctionCall<T extends Contract> {
   args: ReadonlyArray<unknown>;
 }
 
-export interface ProxyOptions<T extends Contract> {
+export interface ProxyOptions<T extends Contract = Contract> {
   salt?: BigNumberish;
   overrides?: Overrides;
   proxyAdmin?: ProxyAdmin;
   upgradeCall?: FunctionCall<T> | FunctionName<T>;
   initializer?: FunctionCall<T> | FunctionName<T>;
+  multisig?: Safe;
 }
 
 export function makeTemplates(deployer: Deployer) {
@@ -77,6 +81,20 @@ export function makeTemplates(deployer: Deployer) {
     proxyAdminAddress: Deployer.factoryAddress(new ProxyAdmin__factory(), {
       salt: deployer.signer.address,
     }),
+    getProxyAdmin: async (proxy: string) => {
+      try {
+        const data = await deployer.provider.call({
+          to: proxy,
+          data: '0xf851a440',
+        });
+        return ProxyAdmin__factory.connect(
+          defaultAbiCoder.decode(['address'], data)[0],
+          deployer.signer
+        );
+      } catch (e) {
+        return undefined;
+      }
+    },
     transparentUpgradeableProxy: async <T extends Contract>(
       id: string,
       implementation: T,
@@ -86,6 +104,7 @@ export function makeTemplates(deployer: Deployer) {
         proxyAdmin,
         upgradeCall,
         initializer,
+        multisig,
       }: ProxyOptions<T> = {}
     ) => {
       proxyAdmin = proxyAdmin ?? (await templates.proxyAdmin());
@@ -110,6 +129,25 @@ export function makeTemplates(deployer: Deployer) {
       )) as T;
 
       await proxy.deployed();
+
+      // fetch the current owner of the proxy contract, and use that to upgrade
+      if (!proxy.deployTransaction) {
+        const expectedAdmin = await proxyAdmin.getProxyAdmin(proxy.address);
+
+        proxyAdmin = ProxyAdmin__factory.connect(
+          expectedAdmin,
+          proxyAdmin.signer
+        );
+
+        const expectedOwner = await proxyAdmin.owner();
+        if (
+          !BigNumber.from(await proxyAdmin.signer.getAddress()).eq(
+            expectedOwner
+          )
+        ) {
+          throw new Error('invalid proxy owner');
+        }
+      }
 
       const currentImpl = BigNumber.from(
         await proxyAdmin.getProxyImplementation(proxy.address)
@@ -140,14 +178,39 @@ export function makeTemplates(deployer: Deployer) {
           ? encodeFunctionCall<T>(implementation.interface, call)
           : undefined;
 
-        const tx = data
-          ? await proxyAdmin.upgradeAndCall(
-              proxy.address,
-              implementation.address,
-              data
-            )
-          : await proxyAdmin.upgrade(proxy.address, implementation.address);
-        await tx.wait();
+        if (multisig) {
+          const txData = data
+            ? proxyAdmin.interface.encodeFunctionData('upgradeAndCall', [
+                proxy.address,
+                implementation.address,
+                data,
+              ])
+            : proxyAdmin.interface.encodeFunctionData('upgrade', [
+                proxy.address,
+                implementation.address,
+              ]);
+
+          if (multisig instanceof Safe) {
+            await multisig.createTransaction({
+              safeTransactionData: {
+                data: txData,
+                to: proxyAdmin.address,
+                value: '0',
+              },
+            });
+          } else {
+            throw new Error('Unknown multisig');
+          }
+        } else {
+          const tx = data
+            ? await proxyAdmin.upgradeAndCall(
+                proxy.address,
+                implementation.address,
+                data
+              )
+            : await proxyAdmin.upgrade(proxy.address, implementation.address);
+          await tx.wait();
+        }
       }
 
       const result: T = implementation.attach(proxy.address) as T;

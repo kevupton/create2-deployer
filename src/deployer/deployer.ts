@@ -30,7 +30,7 @@ export type Head<T extends unknown[]> = T extends [
   ? Head
   : Array<unknown>;
 
-export interface DeployOptions<T extends ContractFactory> {
+export interface DeployOptions<T extends ContractFactory = ContractFactory> {
   args?: Head<Parameters<T['deploy']>>;
   salt?: BigNumberish;
   calls?: (Create2Deployer.FunctionCallStruct | PromiseOrValue<BytesLike>)[];

@@ -1,5 +1,6 @@
 import {BigNumberish, ContractFactory} from 'ethers';
 import {DeployOptions, ProxyOptions} from '../deployer';
+import {DeploymentInfo} from './registry';
 
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface ConfigureOptions {}
@@ -13,27 +14,13 @@ export interface ConstructorOptions {}
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface ContractSuite {}
 
-export interface ContractConfiguration<
+export interface BaseConfiguration<
   T extends ContractFactory = ContractFactory
 > {
   id?: string;
   name: string;
   roles?: Record<string, symbol>;
   requiredRoles?: (symbol | ((account: string) => Promise<void>))[];
-  deployOptions?: DeployOptions<T>;
-  proxy?:
-    | {
-        id?: string;
-        type: 'TransparentUpgradeableProxy';
-        options?: ProxyOptions<Awaited<ReturnType<T['deploy']>>>;
-      }
-    | {
-        id?: string;
-        type: 'UpgradeableBeacon';
-        options?: {
-          salt: BigNumberish;
-        };
-      };
   dependencies?: string[];
 
   deployed?(contracts: ContractSuite): Promise<void> | void;
@@ -58,7 +45,41 @@ export interface ContractConfiguration<
   ): Promise<void> | void;
 
   configured?(contracts: ContractSuite): Promise<void> | void;
+
+  finalized?(contracts: ContractSuite): Promise<void> | void;
 }
+
+export interface DefaultConfiguration<T extends ContractFactory>
+  extends BaseConfiguration<T> {
+  deployOptions?: DeployOptions<T>;
+}
+
+export interface ProxyConfiguration<T extends ContractFactory = ContractFactory>
+  extends BaseConfiguration<T> {
+  deployOptions?:
+    | DeployOptions<T>
+    | ((
+        options: DeploymentInfo
+      ) => DeployOptions<T> | PromiseLike<DeployOptions<T>>);
+  proxy:
+    | {
+        id?: string;
+        type: 'TransparentUpgradeableProxy';
+        owner?: string;
+        options?: ProxyOptions<Awaited<ReturnType<T['deploy']>>>;
+      }
+    | {
+        id?: string;
+        type: 'UpgradeableBeacon';
+        owner?: string;
+        options?: {
+          salt: BigNumberish;
+        };
+      };
+}
+
+export type ContractConfiguration<T extends ContractFactory = ContractFactory> =
+  DefaultConfiguration<T> | ProxyConfiguration<T>;
 
 export type ProxyType = 'TransparentUpgradeableProxy';
 

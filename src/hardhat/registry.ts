@@ -2,8 +2,8 @@ import {
   DeploymentRegistry,
   DeploymentRegistry__factory,
 } from '../../typechain-types';
-import {BytesLike, constants, Contract} from 'ethers';
-import {keccak256, toUtf8Bytes} from 'ethers/lib/utils';
+import {BigNumber, BytesLike, constants, Contract} from 'ethers';
+import {hexDataLength, keccak256, toUtf8Bytes} from 'ethers/lib/utils';
 import {debug, wait} from '../utils';
 import {Deployer} from '../deployer';
 
@@ -11,6 +11,19 @@ export interface PendingCall {
   test: () => Promise<void>;
   call: BytesLike;
   context: any;
+}
+
+export interface DeploymentInfo {
+  deployed: boolean;
+  address: string;
+  owner: string;
+  initialized: boolean;
+  hash: string;
+  block: BigNumber;
+  timestamp: BigNumber;
+  lastConfigureOptions: string;
+  constructOptions: string;
+  initializeOptions: string;
 }
 
 export class Registry {
@@ -77,18 +90,20 @@ export class Registry {
 
   async deploymentInfo<T extends Record<string, string>>(suite: T) {
     const registry = await this.contract;
-    const keys: Record<string, keyof T> = {};
+    const keys: Record<string, {key: keyof T; address: string}> = {};
     const calls: string[] = Object.entries(suite).map(([key, address], i) => {
-      keys[i] = key;
+      keys[i] = {key, address};
       return registry.interface.encodeFunctionData('deploymentInfo', [address]);
     });
     const infos = await registry.callStatic.multicall(calls);
-    return infos.reduce((results, result, i) => {
+    const results = infos.reduce((results, result, i) => {
       const decoded = registry.interface.decodeFunctionResult(
         'deploymentInfo',
         result
-      ) as unknown as DeploymentRegistry.DeploymentInfoStruct;
-      results[keys[i]] = {
+      ) as unknown as DeploymentRegistry.DeploymentInfoStructOutput;
+      results[keys[i].key] = {
+        deployed: BigNumber.from(decoded.block).gt(0),
+        address: keys[i].address,
         owner: decoded.owner,
         initialized: decoded.initialized,
         hash: decoded.hash,
@@ -99,7 +114,18 @@ export class Registry {
         initializeOptions: decoded.initializeOptions,
       };
       return results;
-    }, {} as Record<keyof T, DeploymentRegistry.DeploymentInfoStruct>);
+    }, {} as Record<keyof T, DeploymentInfo>);
+
+    for (const result of Object.values(results)) {
+      if (!result.deployed) {
+        const code = await registry.provider.getCode(result.address);
+        if (hexDataLength(code) > 0) {
+          result.deployed = true;
+        }
+      }
+    }
+
+    return results;
   }
 
   async registerOptions(options: object) {
