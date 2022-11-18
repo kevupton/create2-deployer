@@ -19,11 +19,7 @@ import {Deployer, DeployOptions} from '../deployer';
 import {hexDataLength} from 'ethers/lib/utils';
 import Safe from '@gnosis.pm/safe-core-sdk';
 import EthersAdapter from '@gnosis.pm/safe-ethers-lib';
-import {
-  BeaconProxy__factory,
-  ProxyAdmin__factory,
-  UpgradeableBeacon__factory,
-} from '../proxies';
+import {ProxyAdmin__factory, UpgradeableBeacon__factory} from '../proxies';
 import {getAdminAddress} from '@openzeppelin/upgrades-core';
 
 export type ContractConfigurationWithId = ContractConfiguration & {id: string};
@@ -522,6 +518,7 @@ export class Environment {
       if (!passing[config.id]) continue;
 
       if ('proxy' in config && config.proxy.owner) {
+        console.log('transferring ownership', config.name);
         await this._transferOwnership(
           deployer,
           contract.address,
@@ -608,6 +605,7 @@ export class Environment {
           console.error(
             'failed fetching the proxy admin details',
             address,
+            proxyAdmin?.address,
             e.message
           );
         }
@@ -719,12 +717,20 @@ export class Environment {
 
   private async _getProxyAdmin(address: string) {
     try {
-      return ProxyAdmin__factory.connect(
-        await getAdminAddress(this.hre.ethers.provider, address),
-        (await this.deployer).signer
+      const adminAddress = await getAdminAddress(
+        this.hre.ethers.provider,
+        address
       );
+
+      if (!BigNumber.from(adminAddress).eq(0)) {
+        return ProxyAdmin__factory.connect(
+          adminAddress,
+          (await this.deployer).signer
+        );
+      }
     } catch (e) {
-      return undefined;
+      // do nothing
     }
+    return undefined;
   }
 }
