@@ -18,6 +18,7 @@ import {Placeholder__factory} from '../../typechain-types/factories/contracts/Pl
 import {
   defaultAbiCoder,
   hexConcat,
+  hexDataLength,
   Interface,
   keccak256,
   toUtf8Bytes,
@@ -107,7 +108,17 @@ export function makeTemplates(deployer: Deployer) {
         multisig,
       }: ProxyOptions<T> = {}
     ) => {
-      proxyAdmin = proxyAdmin ?? (await templates.proxyAdmin());
+      const predictedAddress = templates.transparentUpgradeableProxyAddress(
+        id,
+        salt
+      );
+      const code = await deployer.provider.getCode(predictedAddress);
+
+      proxyAdmin =
+        proxyAdmin ??
+        ((hexDataLength(code) > 0 &&
+          (await templates.getProxyAdmin(predictedAddress))) ||
+          (await templates.proxyAdmin()));
 
       await proxyAdmin.deployed();
       await implementation.deployed();
@@ -129,25 +140,6 @@ export function makeTemplates(deployer: Deployer) {
       )) as T;
 
       await proxy.deployed();
-
-      // fetch the current owner of the proxy contract, and use that to upgrade
-      if (!proxy.deployTransaction) {
-        const expectedAdmin = await proxyAdmin.getProxyAdmin(proxy.address);
-
-        proxyAdmin = ProxyAdmin__factory.connect(
-          expectedAdmin,
-          proxyAdmin.signer
-        );
-
-        const expectedOwner = await proxyAdmin.owner();
-        if (
-          !BigNumber.from(await proxyAdmin.signer.getAddress()).eq(
-            expectedOwner
-          )
-        ) {
-          throw new Error('invalid proxy owner');
-        }
-      }
 
       const currentImpl = BigNumber.from(
         await proxyAdmin.getProxyImplementation(proxy.address)

@@ -577,23 +577,33 @@ export class Environment {
         let proxyAdmin = await deployer.templates.getProxyAdmin(address);
         let safe: Safe | undefined;
 
-        if (proxyAdmin) {
-          const owner = await proxyAdmin.owner();
-          const code = await proxyAdmin.provider.getCode(owner);
+        try {
+          if (proxyAdmin) {
+            const owner = await proxyAdmin.owner();
+            const code = await proxyAdmin.provider.getCode(owner);
 
-          // if there is a bytecode lets assume it is a proxy admin
-          if (hexDataLength(code) > 0) {
-            safe = await Safe.create({
-              ethAdapter: new EthersAdapter({
-                ethers,
-                signer: proxyAdmin.signer,
-              }),
-              safeAddress: owner,
-            });
+            // if there is a bytecode lets assume it is a proxy admin
+            if (hexDataLength(code) > 0) {
+              safe = await Safe.create({
+                ethAdapter: new EthersAdapter({
+                  ethers,
+                  signer: proxyAdmin.signer,
+                }),
+                safeAddress: owner,
+              });
+            } else if (
+              !BigNumber.from(owner).eq(await proxyAdmin.signer.getAddress())
+            ) {
+              proxyAdmin = proxyAdmin.connect(
+                await this.hre.ethers.getSigner(owner)
+              );
+            }
           }
-
-          proxyAdmin = proxyAdmin.connect(
-            await this.hre.ethers.getSigner(owner)
+        } catch (e: any) {
+          console.error(
+            'failed fetching the proxy admin details',
+            address,
+            e.message
           );
         }
 
@@ -650,7 +660,13 @@ export class Environment {
       deployer.signer
     );
 
-    const owner = await contract.owner();
+    let owner: string;
+    try {
+      owner = await contract.owner();
+    } catch (e) {
+      console.error('failed getting owner for ' + address);
+      return;
+    }
 
     if (BigNumber.from(owner).eq(newOwner)) {
       return;
