@@ -23,11 +23,10 @@ import {
   keccak256,
   toUtf8Bytes,
 } from 'ethers/lib/utils';
-import {Web3Provider} from '@ethersproject/providers';
 import {Create2Deployer} from '../../typechain-types';
 import {debug} from '../utils';
 import Safe from '@gnosis.pm/safe-core-sdk';
-import EthersAdapter from '@gnosis.pm/safe-ethers-lib';
+import {getAdminAddress} from '@openzeppelin/upgrades-core/src/eip-1967';
 
 export type FunctionName<T extends Contract> =
   keyof T['interface']['functions'];
@@ -82,20 +81,6 @@ export function makeTemplates(deployer: Deployer) {
     proxyAdminAddress: Deployer.factoryAddress(new ProxyAdmin__factory(), {
       salt: deployer.signer.address,
     }),
-    getProxyAdmin: async (proxy: string) => {
-      try {
-        const data = await deployer.provider.call({
-          to: proxy,
-          data: '0xf851a440',
-        });
-        return ProxyAdmin__factory.connect(
-          defaultAbiCoder.decode(['address'], data)[0],
-          deployer.signer
-        );
-      } catch (e) {
-        return undefined;
-      }
-    },
     transparentUpgradeableProxy: async <T extends Contract>(
       id: string,
       implementation: T,
@@ -108,17 +93,7 @@ export function makeTemplates(deployer: Deployer) {
         multisig,
       }: ProxyOptions<T> = {}
     ) => {
-      const predictedAddress = templates.transparentUpgradeableProxyAddress(
-        id,
-        salt
-      );
-      const code = await deployer.provider.getCode(predictedAddress);
-
-      proxyAdmin =
-        proxyAdmin ??
-        ((hexDataLength(code) > 0 &&
-          (await templates.getProxyAdmin(predictedAddress))) ||
-          (await templates.proxyAdmin()));
+      proxyAdmin = proxyAdmin ?? (await templates.proxyAdmin());
 
       await proxyAdmin.deployed();
       await implementation.deployed();

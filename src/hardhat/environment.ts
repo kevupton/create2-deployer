@@ -19,7 +19,12 @@ import {Deployer, DeployOptions} from '../deployer';
 import {hexDataLength} from 'ethers/lib/utils';
 import Safe from '@gnosis.pm/safe-core-sdk';
 import EthersAdapter from '@gnosis.pm/safe-ethers-lib';
-import {BeaconProxy__factory, UpgradeableBeacon__factory} from '../proxies';
+import {
+  BeaconProxy__factory,
+  ProxyAdmin__factory,
+  UpgradeableBeacon__factory,
+} from '../proxies';
+import {getAdminAddress} from '@openzeppelin/upgrades-core';
 
 export type ContractConfigurationWithId = ContractConfiguration & {id: string};
 
@@ -574,7 +579,7 @@ export class Environment {
 
     if ('proxy' in config) {
       if (config.proxy.type === 'TransparentUpgradeableProxy') {
-        let proxyAdmin = await deployer.templates.getProxyAdmin(address);
+        let proxyAdmin = await this._getProxyAdmin(address);
         let safe: Safe | undefined;
 
         try {
@@ -656,7 +661,7 @@ export class Environment {
     newOwner: string
   ) {
     let contract = UpgradeableBeacon__factory.connect(
-      (await deployer.templates.getProxyAdmin(address))?.address || address,
+      (await this._getProxyAdmin(address))?.address || address,
       deployer.signer
     );
 
@@ -709,6 +714,17 @@ export class Environment {
           '\n' +
           e.message
       );
+    }
+  }
+
+  private async _getProxyAdmin(address: string) {
+    try {
+      return ProxyAdmin__factory.connect(
+        await getAdminAddress(this.hre.ethers.provider, address),
+        (await this.deployer).signer
+      );
+    } catch (e) {
+      return undefined;
     }
   }
 }
