@@ -27,6 +27,7 @@ import {Create2Deployer} from '../../typechain-types';
 import {debug} from '../utils';
 import Safe from '@gnosis.pm/safe-core-sdk';
 import {getAdminAddress} from '@openzeppelin/upgrades-core/src/eip-1967';
+import SafeServiceClient from '@gnosis.pm/safe-service-client';
 
 export type FunctionName<T extends Contract> =
   keyof T['interface']['functions'];
@@ -145,6 +146,7 @@ export function makeTemplates(deployer: Deployer) {
           ? encodeFunctionCall<T>(implementation.interface, call)
           : undefined;
 
+        debug('is multisig?', !!multisig);
         if (multisig) {
           const txData = data
             ? proxyAdmin.interface.encodeFunctionData('upgradeAndCall', [
@@ -158,12 +160,37 @@ export function makeTemplates(deployer: Deployer) {
               ]);
 
           if (multisig instanceof Safe) {
-            await multisig.createTransaction({
+            debug('submitting upgrade to multisig wallet');
+            const safeTransaction = await multisig.createTransaction({
               safeTransactionData: {
                 data: txData,
                 to: proxyAdmin.address,
                 value: '0',
               },
+            });
+            const safeTransactionHash = await multisig.getTransactionHash(
+              safeTransaction
+            );
+            const senderSignature = await multisig.signTransactionHash(
+              safeTransactionHash
+            );
+            const safeService = new SafeServiceClient({
+              txServiceUrl: 'https://safe-transaction.goerli.gnosis.io/',
+              ethAdapter: multisig.getEthAdapter(),
+            });
+
+            debug('proposed tx details', {
+              safeAddress: multisig.getAddress(),
+              safeTransactionData: safeTransaction.data,
+              safeTxHash: safeTransactionHash,
+              senderAddress: senderSignature.signer,
+            });
+            await safeService.proposeTransaction({
+              safeAddress: multisig.getAddress(),
+              safeTransactionData: safeTransaction.data,
+              safeTxHash: safeTransactionHash,
+              senderAddress: senderSignature.signer,
+              senderSignature: senderSignature.data,
             });
           } else {
             throw new Error('Unknown multisig');
