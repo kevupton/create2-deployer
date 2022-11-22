@@ -6,7 +6,8 @@
   "author": "Kevin Upton <kevin@soma.finance>",
   "license": "MIT",
   "scripts": {
-    "postinstall": "yarn run compile",
+    "postinstall": "yarn submodules && yarn run compile",
+    "submodules": "git submodule update --init --recursive",
     "lint": "gts lint",
     "clean": "gts clean",
     "compile": "hardhat compile",
