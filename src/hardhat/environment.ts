@@ -406,6 +406,7 @@ export class Environment {
       if (passing[config.id] && config.prepareConfig) {
         try {
           console.log('preparing config', config.name);
+          // TODO this one does not do anything at this point in time.
           await config.prepareConfig.call(await this._createContext(config));
         } catch (e: any) {
           console.error(

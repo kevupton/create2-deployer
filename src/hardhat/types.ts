@@ -11,6 +11,7 @@ import {HardhatRuntimeEnvironment} from 'hardhat/types';
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface ConfigureOptions {}
 
+// TODO should these options be merged?
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface ConstructorOptions {}
 
