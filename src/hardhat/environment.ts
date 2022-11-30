@@ -1,8 +1,10 @@
 import {BigNumber, Contract, ContractFactory, ethers} from 'ethers';
 import {
+  CallbackContext,
   ConfigOrConstructor,
   ConstructorOptions,
-  ContractConfiguration,
+  ContractConfigurationWithId,
+  ContractFromFactory,
   ContractSuite,
   DependencyConfig,
   DetailedDependencies,
@@ -22,8 +24,6 @@ import EthersAdapter from '@gnosis.pm/safe-ethers-lib';
 import {ProxyAdmin__factory, UpgradeableBeacon__factory} from '../proxies';
 import {getAdminAddress} from '@openzeppelin/upgrades-core';
 
-export type ContractConfigurationWithId = ContractConfiguration & {id: string};
-
 export class Environment {
   public readonly deployer = (process.env.DEPLOYER
     ? this.hre.ethers.getSigner(process.env.DEPLOYER)
@@ -40,6 +40,7 @@ export class Environment {
     ConfigOrConstructor,
     ContractConfigurationWithId
   >();
+  private _contracts: Record<string, Contract> = {};
 
   constructor(public readonly hre: HardhatRuntimeEnvironment) {
     this._ready = this._loadConfigurations('address');
@@ -47,6 +48,10 @@ export class Environment {
 
   get addresses() {
     return this._ready.then(val => val.addressSuite);
+  }
+
+  get contracts() {
+    return this._contracts as ContractSuite;
   }
 
   get configs() {
@@ -75,23 +80,24 @@ export class Environment {
     ]);
 
     debug('address suite', addresses);
+    this._contracts = {};
 
     this._ready = this._loadConfigurations('deploy');
-    const contracts = await this._deployConfigurations(registry);
-    await this._grantRoles(contracts);
+    await this._deployConfigurations(registry);
+    await this._grantRoles();
 
     this._ready = this._loadConfigurations('initialize');
-    const passing = await this._initialize(contracts, registry);
-    await this._prepareConfig(passing, contracts);
+    const passing = await this._initialize(registry);
+    await this._prepareConfig(passing);
 
     this._ready = this._loadConfigurations('configure');
-    await this._configure(passing, contracts, registry);
+    await this._configure(passing, registry);
 
     await registry.sync();
 
-    await this._finalize(passing, contracts);
+    await this._finalize(passing);
 
-    return contracts as ContractSuite;
+    return this.contracts as ContractSuite;
   }
 
   private async _parseConfig(
@@ -129,15 +135,17 @@ export class Environment {
     return newConfig;
   }
 
-  private async _factory(name: string) {
+  private async _factory<T extends ContractFactory = ContractFactory>(
+    name: string
+  ): Promise<T> {
     let factory = this._factories.get(name);
     if (factory) {
-      return factory;
+      return factory as T;
     }
 
     factory = await this.hre.ethers.getContractFactory(name);
     this._factories.set(name, factory);
-    return factory;
+    return factory as T;
   }
 
   private async _getAddress(config: ContractConfigurationWithId) {
@@ -249,13 +257,10 @@ export class Environment {
     return sortedConfigs;
   }
 
-  private _createRoleManager(
-    configs: ContractConfigurationWithId[],
-    contracts: Record<string, Contract>
-  ) {
+  private _createRoleManager(configs: ContractConfigurationWithId[]) {
     const roles = new RoleManager();
     for (const config of configs) {
-      const contract = contracts[config.id];
+      const contract = this._contracts[config.id];
       if (!contract) {
         debug('missing contract for ' + config.id);
       }
@@ -267,12 +272,12 @@ export class Environment {
     return roles;
   }
 
-  private async _grantRoles(contracts: Record<string, Contract>) {
+  private async _grantRoles() {
     const configs = await this.configs;
-    const roles = await this._createRoleManager(configs, contracts);
+    const roles = await this._createRoleManager(configs);
 
     for (const config of configs) {
-      const contract = contracts[config.id];
+      const contract = this._contracts[config.id];
 
       if (!contract) {
         console.error('missing contract for', config.name);
@@ -318,13 +323,11 @@ export class Environment {
   }
 
   private async _deployConfigurations(registry: Registry) {
-    const [configs, deployer, addresses] = await Promise.all([
+    const [configs, deployer] = await Promise.all([
       this.configs,
       this.deployer,
       this.addresses,
     ]);
-    const contracts: Record<string, Contract> = {};
-
     const constructorId = await registry.registerOptions(
       this.hre.config.environment.constructorOptions
     );
@@ -333,27 +336,7 @@ export class Environment {
       console.log('deploying', config.name);
 
       try {
-        const contract = await this._deployContract(
-          config,
-          deployer,
-          registry,
-          constructorId
-        );
-
-        contracts[config.id] = contract;
-
-        if (contract.deployTransaction) {
-          try {
-            await config.deployed?.(contracts);
-          } catch (e: any) {
-            console.error(
-              'event handler "deployed" failed for',
-              config.name,
-              ' - ',
-              e.message
-            );
-          }
-        }
+        await this._deployContract(config, deployer, registry, constructorId);
       } catch (e: unknown) {
         console.error(
           'failed to deploy',
@@ -363,14 +346,9 @@ export class Environment {
         );
       }
     }
-
-    return contracts;
   }
 
-  private async _initialize(
-    contracts: Record<string, Contract>,
-    registry: Registry
-  ) {
+  private async _initialize(registry: Registry) {
     const [configs, addresses] = await Promise.all([
       this.configs,
       this.addresses,
@@ -384,7 +362,7 @@ export class Environment {
     const passing: Record<string, boolean> = {};
 
     for (const config of configs) {
-      const contract = contracts[config.id];
+      const contract = this._contracts[config.id];
       passing[config.id] = true;
 
       if (!contract) {
@@ -396,18 +374,14 @@ export class Environment {
       if (!deploymentInfo[config.id].initialized && config.initialize) {
         try {
           console.log('initializing', config.name);
-          await config.initialize(
-            contracts,
-            this.hre.config.environment.configureOptions,
-            this.hre.config.environment.configureOptions
-          );
+          await config.initialize.call(await this._createContext(config));
 
           registry.setInitialized(contract.address, constructorId);
 
           if (config.initialized) {
             try {
               console.log('event initialized', config.name);
-              await config.initialized(contracts);
+              await config.initialized.call(await this._createContext(config));
             } catch (e: any) {
               console.error(
                 'event "initialized" failed for',
@@ -427,19 +401,13 @@ export class Environment {
     return passing;
   }
 
-  private async _prepareConfig(
-    passing: Record<string, boolean>,
-    contracts: Record<string, Contract>
-  ) {
+  private async _prepareConfig(passing: Record<string, boolean>) {
     const configs = await this.configs;
     for (const config of configs) {
       if (passing[config.id] && config.prepareConfig) {
         try {
           console.log('preparing config', config.name);
-          await config.prepareConfig(
-            contracts,
-            this.hre.config.environment.configureOptions
-          );
+          await config.prepareConfig.call(await this._createContext(config));
         } catch (e: any) {
           console.error(
             'prepareConfig failed for',
@@ -454,7 +422,6 @@ export class Environment {
 
   private async _configure(
     passing: Record<string, boolean>,
-    contracts: Record<string, Contract>,
     registry: Registry
   ) {
     const [configs] = await Promise.all([this.configs]);
@@ -464,51 +431,27 @@ export class Environment {
     );
 
     for (const config of configs) {
-      const contract = contracts[config.id];
-
-      if (!contract) {
-        console.error('missing contract for', config.name);
-      }
-
-      if (passing[config.id] && config.configure && contract) {
-        try {
-          console.log('configuring', config.name);
-          await config.configure(
-            contracts,
-            this.hre.config.environment.configureOptions,
-            this.hre.config.environment.constructorOptions
-          );
-          registry.setConfigured(contract.address, configureId);
-          if (config.configured) {
-            try {
-              console.log('event configured', config.name);
-              await config.configured(contracts);
-            } catch (e: any) {
-              console.error(
-                'event "configured" failed for',
-                config.name,
-                ' - ',
-                e.message
-              );
-            }
-          }
-        } catch (e: any) {
-          console.error('configure failed for', config.name, ' - ', e.message);
-          passing[config.id] = false;
-        }
-      }
+      await this._configureContract(config, configureId, passing, registry);
     }
   }
 
-  private async _finalize(
-    passing: Record<string, boolean>,
-    contracts: Record<string, Contract>
-  ) {
+  private async _finalize(passing: Record<string, boolean>) {
     const [configs] = await Promise.all([this.configs]);
     const deployer = await this.deployer;
 
     for (const config of configs) {
-      const contract = contracts[config.id];
+      if (config.finalize) {
+        try {
+          console.log('finalizing', config.name);
+          await config.finalize.call(await this._createContext(config));
+        } catch (e: any) {
+          console.error('finalizing failed for', config.name, ' - ', e.message);
+        }
+      }
+    }
+
+    for (const config of configs) {
+      const contract = this._contracts[config.id];
 
       if (!contract) {
         console.error('missing contract for', config.name);
@@ -529,7 +472,7 @@ export class Environment {
       if (config.finalized) {
         try {
           console.log('event finalized', config.name);
-          await config.finalized(contracts);
+          await config.finalized.call(await this._createContext(config));
         } catch (e: any) {
           console.error(
             'event finalized failed for',
@@ -542,14 +485,14 @@ export class Environment {
     }
   }
 
-  private async _deployContract(
-    config: ContractConfigurationWithId,
+  private async _deployContract<T extends ContractFactory>(
+    config: ContractConfigurationWithId<T>,
     deployer: Deployer,
     registry: Registry,
     constructorId: string
-  ) {
-    const factory = await this._factory(config.name);
-    let contract: Contract;
+  ): Promise<ContractFromFactory<T>> {
+    const factory: T = await this._factory(config.name);
+    let contract: ContractFromFactory<T>;
     let address: string;
 
     if ('proxy' in config) {
@@ -565,9 +508,9 @@ export class Environment {
         options = config.deployOptions;
       }
 
-      contract = await deployer.deploy(factory, options);
+      contract = await deployer.deploy<T>(factory, options);
     } else {
-      contract = await deployer.deploy(factory, config.deployOptions);
+      contract = await deployer.deploy<T>(factory, config.deployOptions);
       address = contract.address;
     }
 
@@ -620,10 +563,10 @@ export class Environment {
           }
         );
       } else if (config.proxy.type === 'UpgradeableBeacon') {
-        contract = await deployer.templates.upgradeableBeacon(
+        contract = (await deployer.templates.upgradeableBeacon(
           config.proxy.id || config.id,
           config.proxy.options?.salt
-        );
+        )) as any; // TODO to fix this because it is expecting to return the contract but should get upgradeable beacon
       } else {
         throw new Error('invalid proxy type "' + config.proxy['type'] + '"');
       }
@@ -631,12 +574,27 @@ export class Environment {
       await registry.setDeploymentInfo(contract, constructorId);
     }
 
+    this._contracts[config.id] = contract;
+
+    if (contract.deployTransaction) {
+      try {
+        await config.deployed?.call(await this._createContext(config));
+      } catch (e: any) {
+        console.error(
+          'event handler "deployed" failed for',
+          config.name,
+          ' - ',
+          e.message
+        );
+      }
+    }
+
     return contract;
   }
 
-  private _getProxyAddress(
+  private _getProxyAddress<T extends ContractFactory>(
     deployer: Deployer,
-    config: ProxyConfiguration<ContractFactory> & {id: string}
+    config: ProxyConfiguration<T> & {id: string}
   ) {
     if (config.proxy.type === 'TransparentUpgradeableProxy') {
       return deployer.templates.transparentUpgradeableProxyAddress(
@@ -732,5 +690,82 @@ export class Environment {
       // do nothing
     }
     return undefined;
+  }
+
+  private async _createContext<T extends ContractFactory = ContractFactory>(
+    config: ContractConfigurationWithId<T>
+  ): Promise<CallbackContext<T>> {
+    const [deployer, addresses, registry] = await Promise.all([
+      this.deployer,
+      this.addresses,
+      Registry.from(this.deployer),
+    ]);
+
+    return {
+      hre: this.hre,
+      contracts: this._contracts,
+      deployer,
+      addresses,
+      registry,
+      config,
+      constructorOptions: this.hre.config.environment.constructorOptions,
+      configureOptions: this.hre.config.environment.configureOptions,
+      configure: async () => {
+        const configureId = await registry.registerOptions(
+          this.hre.config.environment.configureOptions
+        );
+        await this._configureContract(config, configureId, {}, registry);
+      },
+      deploy: async (): Promise<ContractFromFactory<T>> => {
+        const constructorId = await registry.registerOptions(
+          this.hre.config.environment.constructorOptions
+        );
+
+        console.log('deploying', config.name);
+        return await this._deployContract(
+          config,
+          deployer,
+          registry,
+          constructorId
+        );
+      },
+    };
+  }
+
+  private async _configureContract<T extends ContractFactory = ContractFactory>(
+    config: ContractConfigurationWithId<T>,
+    configureId: string,
+    passing: Record<string, boolean>,
+    registry: Registry
+  ) {
+    const contract = this._contracts[config.id];
+
+    if (!contract) {
+      console.error('missing contract for', config.name);
+    }
+
+    if (passing[config.id] && config.configure && contract) {
+      try {
+        console.log('configuring', config.name);
+        await config.configure.call(await this._createContext(config));
+        registry.setConfigured(contract.address, configureId);
+        if (config.configured) {
+          try {
+            console.log('event configured', config.name);
+            await config.configured.call(await this._createContext(config));
+          } catch (e: any) {
+            console.error(
+              'event "configured" failed for',
+              config.name,
+              ' - ',
+              e.message
+            );
+          }
+        }
+      } catch (e: any) {
+        console.error('configure failed for', config.name, ' - ', e.message);
+        passing[config.id] = false;
+      }
+    }
   }
 }

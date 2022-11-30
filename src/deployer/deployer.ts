@@ -22,6 +22,7 @@ import {Create2Deployer} from '../../typechain-types/contracts/Create2Deployer';
 import {JsonRpcSigner} from '@ethersproject/providers';
 import {Create2Deployer__factory} from '../../typechain-types';
 import {PromiseOrValue} from '../../typechain-types/common';
+import {ContractFromFactory} from '../hardhat';
 
 export type Head<T extends unknown[]> = T extends [
   ...other: infer Head,
@@ -101,13 +102,13 @@ export class Deployer {
       salt = this.defaultSalt,
       overrides = {},
     }: DeployOptions<T> = {}
-  ): Promise<ReturnType<T['attach']>> {
+  ): Promise<ContractFromFactory<T>> {
     await this.validate('deploy', factory);
     const contractAddress = Deployer.factoryAddress(factory, {args, salt});
     const code = await this.provider.getCode(contractAddress);
     const contract = factory
       .connect(this.signer)
-      .attach(contractAddress) as ReturnType<T['attach']>;
+      .attach(contractAddress) as ContractFromFactory<T>;
 
     if (hexDataLength(code)) {
       contract._deployedPromise = Promise.resolve(contract);

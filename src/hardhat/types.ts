@@ -1,6 +1,7 @@
 import {BigNumberish, ContractFactory} from 'ethers';
-import {DeployOptions, ProxyOptions} from '../deployer';
-import {DeploymentInfo} from './registry';
+import {Deployer, DeployOptions, ProxyOptions} from '../deployer';
+import {DeploymentInfo, Registry} from './registry';
+import {HardhatRuntimeEnvironment} from 'hardhat/types';
 
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface ConfigureOptions {}
@@ -14,6 +15,28 @@ export interface ConstructorOptions {}
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface ContractSuite {}
 
+export type AddressSuite = {
+  [key in keyof ContractSuite]: string;
+};
+
+export interface CallbackContext<T extends ContractFactory = ContractFactory> {
+  deployer: Deployer;
+  contracts: ContractSuite;
+  registry: Registry;
+  addresses: AddressSuite;
+  hre: HardhatRuntimeEnvironment;
+  constructorOptions: ConstructorOptions;
+  configureOptions: ConfigureOptions;
+  config: ContractConfigurationWithId<T>;
+
+  deploy(): Promise<ContractFromFactory<T>>;
+
+  configure(): Promise<void>;
+}
+
+export type ContractFromFactory<T extends ContractFactory = ContractFactory> =
+  Awaited<ReturnType<T['deploy']>>;
+
 export interface BaseConfiguration<
   T extends ContractFactory = ContractFactory
 > {
@@ -23,30 +46,27 @@ export interface BaseConfiguration<
   requiredRoles?: (symbol | ((account: string) => Promise<void>))[];
   dependencies?: string[];
 
-  deployed?(contracts: ContractSuite): Promise<void> | void;
-
-  initialize?(
-    contracts: ContractSuite,
-    constructorOptions: ConstructorOptions,
-    configureOptions: ConfigureOptions
+  deployed?(
+    this: Omit<CallbackContext<T>, 'contracts'> & {
+      contracts: Partial<ContractSuite>;
+    }
   ): Promise<void> | void;
 
-  initialized?(contracts: ContractSuite): Promise<void> | void;
+  initialize?(this: CallbackContext): Promise<void> | void;
+
+  initialized?(this: CallbackContext): Promise<void> | void;
 
   prepareConfig?(
-    contracts: ContractSuite,
-    options: ConfigureOptions
+    this: CallbackContext
   ): Promise<ConfigureOptions> | ConfigureOptions;
 
-  configure?(
-    contracts: ContractSuite,
-    options: ConfigureOptions,
-    constructorOptions: ConstructorOptions
-  ): Promise<void> | void;
+  configure?(this: CallbackContext): Promise<void> | void;
 
-  configured?(contracts: ContractSuite): Promise<void> | void;
+  configured?(this: CallbackContext): Promise<void> | void;
 
-  finalized?(contracts: ContractSuite): Promise<void> | void;
+  finalize?(this: CallbackContext): Promise<void> | void;
+
+  finalized?(this: CallbackContext): Promise<void> | void;
 }
 
 export interface DefaultConfiguration<T extends ContractFactory>
@@ -66,7 +86,7 @@ export interface ProxyConfiguration<T extends ContractFactory = ContractFactory>
         id?: string;
         type: 'TransparentUpgradeableProxy';
         owner?: string;
-        options?: ProxyOptions<Awaited<ReturnType<T['deploy']>>>;
+        options?: ProxyOptions<ContractFromFactory<T>>;
       }
     | {
         id?: string;
@@ -80,6 +100,10 @@ export interface ProxyConfiguration<T extends ContractFactory = ContractFactory>
 
 export type ContractConfiguration<T extends ContractFactory = ContractFactory> =
   DefaultConfiguration<T> | ProxyConfiguration<T>;
+
+export type ContractConfigurationWithId<
+  T extends ContractFactory = ContractFactory
+> = ContractConfiguration<T> & {id: string};
 
 export type ProxyType = 'TransparentUpgradeableProxy';
 
