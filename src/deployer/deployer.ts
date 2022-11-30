@@ -58,6 +58,9 @@ export interface CreateTemplateOptions<T extends ContractFactory> {
   overrides?: Overrides & {from?: string | Promise<string>};
 }
 
+export type ContractFromFactory<T extends ContractFactory = ContractFactory> =
+  Awaited<ReturnType<T['deploy']>>;
+
 export const CREATE2_DEPLOYER_ADDRESS =
   '0x07C25C3fcFb51B24Cf325769Ea2E381A309930E2';
 
@@ -101,13 +104,13 @@ export class Deployer {
       salt = this.defaultSalt,
       overrides = {},
     }: DeployOptions<T> = {}
-  ): Promise<ReturnType<T['attach']>> {
+  ): Promise<ContractFromFactory<T>> {
     await this.validate('deploy', factory);
     const contractAddress = Deployer.factoryAddress(factory, {args, salt});
     const code = await this.provider.getCode(contractAddress);
     const contract = factory
       .connect(this.signer)
-      .attach(contractAddress) as ReturnType<T['attach']>;
+      .attach(contractAddress) as ContractFromFactory<T>;
 
     if (hexDataLength(code)) {
       contract._deployedPromise = Promise.resolve(contract);
