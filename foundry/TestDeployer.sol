@@ -8,7 +8,7 @@ import '../contracts/Create2Deployer.sol';
 
 // Create2Deployer foundry contract
 // USAGE: contract TestContract is Create2DeployerHelper(0x... , 0)
-contract Deployer is Test {
+contract TestDeployer is Test {
     address internal constant CREATE2_DEPLOYER_ADDRESS = 0x07C25C3fcFb51B24Cf325769Ea2E381A309930E2;
 
     uint256 internal immutable defaultSalt;
@@ -24,6 +24,10 @@ contract Deployer is Test {
         defaultSalt = _defaultSalt;
     }
 
+    function deploy(string memory name) internal returns (address addr) {
+        return deploy(name, "", defaultSalt);
+    }
+
     function deploy(
         string memory name,
         bytes memory args
@@ -36,8 +40,15 @@ contract Deployer is Test {
         bytes memory args,
         uint256 salt
     ) internal returns (address addr) {
-        Create2Deployer.FunctionCall[] memory calls = new Create2Deployer.FunctionCall[0];
+        Create2Deployer.FunctionCall[] memory calls = new Create2Deployer.FunctionCall[](0);
         return deploy(name, args, salt, calls);
+    }
+
+    function deploy(
+        string memory name,
+        uint256 salt
+    ) internal returns (address addr) {
+        return deploy(name, "", salt);
     }
 
     function deploy(
@@ -46,6 +57,21 @@ contract Deployer is Test {
         Create2Deployer.FunctionCall[] memory calls
     ) internal returns (address addr) {
         return deploy(name, args, defaultSalt, calls);
+    }
+
+    function deploy(
+        string memory name,
+        Create2Deployer.FunctionCall[] memory calls
+    ) internal returns (address addr) {
+        return deploy(name, "", calls);
+    }
+
+    function deploy(
+        string memory name,
+        uint256 salt,
+        Create2Deployer.FunctionCall[] memory calls
+    ) internal returns (address addr) {
+        return deploy(name, "", salt, calls);
     }
 
     function deploy(
@@ -60,12 +86,24 @@ contract Deployer is Test {
         }
     }
 
-    function factoryAddress(string memory name, bytes memory args) internal pure returns (address addr) {
+    function factoryAddress(string memory name) internal view returns (address addr) {
+        return factoryAddress(name, "");
+    }
+
+    function factoryAddress(string memory name, bytes memory args) internal view returns (address addr) {
         return factoryAddress(name, args, defaultSalt);
     }
 
-    function factoryAddress(string memory name, bytes memory args, uint256 salt) internal pure returns (address addr) {
-        return deployAddress(_bytecode(name, ags), salt);
+    function factoryAddress(string memory name, uint256 salt) internal view returns (address addr) {
+        return factoryAddress(name, "", salt);
+    }
+
+    function factoryAddress(string memory name, bytes memory args, uint256 salt) internal view returns (address addr) {
+        return deployAddress(_bytecode(name, args), salt);
+    }
+
+    function deployAddress(bytes memory bytecode) internal view returns (address addr) {
+        return deployAddress(bytecode, defaultSalt);
     }
 
     function deployAddress(bytes memory bytecode) internal pure returns (address addr) {
