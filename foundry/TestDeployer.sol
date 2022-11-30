@@ -106,10 +106,6 @@ contract TestDeployer is Test {
         return deployAddress(bytecode, defaultSalt);
     }
 
-    function deployAddress(bytes memory bytecode) internal pure returns (address addr) {
-        return deployAddress(bytecode, defaultSalt);
-    }
-
     function deployAddress(bytes memory bytecode, uint256 salt) internal pure returns (address addr) {
         bytes32 hash = keccak256(
             abi.encodePacked(
