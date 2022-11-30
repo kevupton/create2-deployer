@@ -1,5 +1,10 @@
 import {BigNumberish, ContractFactory} from 'ethers';
-import {Deployer, DeployOptions, ProxyOptions} from '../deployer';
+import {
+  ContractFromFactory,
+  Deployer,
+  DeployOptions,
+  ProxyOptions,
+} from '../deployer';
 import {DeploymentInfo, Registry} from './registry';
 import {HardhatRuntimeEnvironment} from 'hardhat/types';
 
@@ -33,9 +38,6 @@ export interface CallbackContext<T extends ContractFactory = ContractFactory> {
 
   configure(): Promise<void>;
 }
-
-export type ContractFromFactory<T extends ContractFactory = ContractFactory> =
-  Awaited<ReturnType<T['deploy']>>;
 
 export interface BaseConfiguration<
   T extends ContractFactory = ContractFactory

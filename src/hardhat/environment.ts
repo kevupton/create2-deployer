@@ -4,7 +4,6 @@ import {
   ConfigOrConstructor,
   ConstructorOptions,
   ContractConfigurationWithId,
-  ContractFromFactory,
   ContractSuite,
   DependencyConfig,
   DetailedDependencies,
@@ -17,7 +16,7 @@ import {RoleManager} from './role-manager';
 import {HardhatRuntimeEnvironment} from 'hardhat/types';
 import {glob} from 'glob';
 import path from 'path';
-import {Deployer, DeployOptions} from '../deployer';
+import {ContractFromFactory, Deployer, DeployOptions} from '../deployer';
 import {hexDataLength} from 'ethers/lib/utils';
 import Safe from '@gnosis.pm/safe-core-sdk';
 import EthersAdapter from '@gnosis.pm/safe-ethers-lib';
