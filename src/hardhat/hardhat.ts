@@ -1,7 +1,7 @@
 import {extendConfig, extendEnvironment} from 'hardhat/config';
 import path from 'path';
 import {Environment} from './environment';
-import {ConfigureOptions, ConstructorOptions} from './types';
+import {EnvironmentSettings} from './types';
 
 export interface Create2Variable {
   file: string;
@@ -12,8 +12,7 @@ export interface Create2Variable {
 
 export interface Create2Environment {
   path?: string;
-  constructorOptions: ConstructorOptions;
-  configureOptions: ConfigureOptions;
+  settings: EnvironmentSettings;
   variables?: Create2Variable[];
   outputPath?: string;
   writeToFile?: boolean;
@@ -47,8 +46,7 @@ extendConfig((config, userConfig) => {
 
   config.environment = {
     ...(userConfig.environment || {
-      constructorOptions: {},
-      configureOptions: {},
+      settings: {},
     }),
     variables,
     variableMapping,

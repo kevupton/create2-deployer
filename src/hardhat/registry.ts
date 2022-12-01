@@ -128,7 +128,7 @@ export class Registry {
     return results;
   }
 
-  async registerOptions(options: object) {
+  async registerSettings(options: object) {
     const registry = await this.contract;
 
     const bytes = toUtf8Bytes(JSON.stringify(options));

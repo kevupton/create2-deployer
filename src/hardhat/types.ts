@@ -9,14 +9,7 @@ import {DeploymentInfo, Registry} from './registry';
 import {HardhatRuntimeEnvironment} from 'hardhat/types';
 
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
-export interface ConfigureOptions {}
-
-// TODO should these options be merged?
-// eslint-disable-next-line @typescript-eslint/no-empty-interface
-export interface ConstructorOptions {}
-
-// eslint-disable-next-line @typescript-eslint/no-empty-interface
-// export interface InitializeOptions {}
+export interface EnvironmentSettings {}
 
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface ContractSuite {}
@@ -31,8 +24,7 @@ export interface CallbackContext<T extends ContractFactory = ContractFactory> {
   registry: Registry;
   addresses: AddressSuite;
   hre: HardhatRuntimeEnvironment;
-  constructorOptions: ConstructorOptions;
-  configureOptions: ConfigureOptions;
+  settings: EnvironmentSettings;
   config: ContractConfigurationWithId<T>;
 
   deploy(): Promise<ContractFromFactory<T>>;
@@ -59,9 +51,17 @@ export interface BaseConfiguration<
 
   initialized?(this: CallbackContext): Promise<void> | void;
 
-  prepareConfig?(
+  prepareInitialize?(
     this: CallbackContext
-  ): Promise<ConfigureOptions> | ConfigureOptions;
+  ): Promise<EnvironmentSettings> | EnvironmentSettings;
+
+  prepareConfigure?(
+    this: CallbackContext
+  ): Promise<EnvironmentSettings> | EnvironmentSettings;
+
+  prepareFinalize?(
+    this: CallbackContext
+  ): Promise<EnvironmentSettings> | EnvironmentSettings;
 
   configure?(this: CallbackContext): Promise<void> | void;
 
@@ -118,7 +118,7 @@ export type ConfigOrConstructor<T extends ContractFactory = ContractFactory> =
   | string
   | ContractConfiguration<T>
   | ((
-      options: ConstructorOptions,
+      options: EnvironmentSettings,
       contracts: AddressValues<ContractSuite>
     ) => Promise<ContractConfiguration<T>> | ContractConfiguration<T>);
 

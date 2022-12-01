@@ -2,7 +2,7 @@ import {BigNumber, Contract, ContractFactory, ethers} from 'ethers';
 import {
   CallbackContext,
   ConfigOrConstructor,
-  ConstructorOptions,
+  EnvironmentSettings,
   ContractConfigurationWithId,
   ContractSuite,
   DependencyConfig,
@@ -40,9 +40,15 @@ export class Environment {
     ContractConfigurationWithId
   >();
   private _contracts: Record<string, Contract> = {};
+  private _settings: EnvironmentSettings;
 
   constructor(public readonly hre: HardhatRuntimeEnvironment) {
     this._ready = this._loadConfigurations('address');
+    this._settings = this.hre.config.environment.settings;
+  }
+
+  get settings() {
+    return this._settings;
   }
 
   get addresses() {
@@ -86,14 +92,17 @@ export class Environment {
     await this._grantRoles();
 
     this._ready = this._loadConfigurations('initialize');
+    await this._prepareSettings('initialize');
     const passing = await this._initialize(registry);
     await this._prepareConfig(passing);
 
     this._ready = this._loadConfigurations('configure');
+    await this._prepareSettings('configure', passing);
     await this._configure(passing, registry);
 
     await registry.sync();
 
+    await this._prepareSettings('finalize', passing);
     await this._finalize(passing);
 
     return this.contracts as ContractSuite;
@@ -101,7 +110,7 @@ export class Environment {
 
   private async _parseConfig(
     configOrConstructor: ConfigOrConstructor,
-    options: ConstructorOptions,
+    options: EnvironmentSettings,
     addressSuite: Record<string, string>
   ): Promise<ContractConfigurationWithId> {
     let newConfig = this._parsedConfigs.get(configOrConstructor);
@@ -309,7 +318,7 @@ export class Environment {
         configs.push(
           await this._parseConfig(
             config,
-            this.hre.config.environment.constructorOptions,
+            this.hre.config.environment.settings,
             addressSuite
           )
         );
@@ -327,8 +336,8 @@ export class Environment {
       this.deployer,
       this.addresses,
     ]);
-    const constructorId = await registry.registerOptions(
-      this.hre.config.environment.constructorOptions
+    const constructorId = await registry.registerSettings(
+      this.hre.config.environment.settings
     );
 
     for (const config of configs) {
@@ -354,8 +363,8 @@ export class Environment {
     ]);
 
     const deploymentInfo = await registry.deploymentInfo(addresses);
-    const constructorId = await registry.registerOptions(
-      this.hre.config.environment.constructorOptions
+    const constructorId = await registry.registerSettings(
+      this.hre.config.environment.settings
     );
 
     const passing: Record<string, boolean> = {};
@@ -403,11 +412,13 @@ export class Environment {
   private async _prepareConfig(passing: Record<string, boolean>) {
     const configs = await this.configs;
     for (const config of configs) {
-      if (passing[config.id] && config.prepareConfig) {
+      if (passing[config.id] && config.prepareInitialize) {
         try {
           console.log('preparing config', config.name);
           // TODO this one does not do anything at this point in time.
-          await config.prepareConfig.call(await this._createContext(config));
+          await config.prepareInitialize.call(
+            await this._createContext(config)
+          );
         } catch (e: any) {
           console.error(
             'prepareConfig failed for',
@@ -426,8 +437,8 @@ export class Environment {
   ) {
     const [configs] = await Promise.all([this.configs]);
 
-    const configureId = await registry.registerOptions(
-      this.hre.config.environment.configureOptions
+    const configureId = await registry.registerSettings(
+      this.hre.config.environment.settings
     );
 
     for (const config of configs) {
@@ -708,17 +719,16 @@ export class Environment {
       addresses,
       registry,
       config,
-      constructorOptions: this.hre.config.environment.constructorOptions,
-      configureOptions: this.hre.config.environment.configureOptions,
+      settings: this._settings,
       configure: async () => {
-        const configureId = await registry.registerOptions(
-          this.hre.config.environment.configureOptions
+        const configureId = await registry.registerSettings(
+          this.hre.config.environment.settings
         );
         await this._configureContract(config, configureId, {}, registry);
       },
       deploy: async (): Promise<ContractFromFactory<T>> => {
-        const constructorId = await registry.registerOptions(
-          this.hre.config.environment.constructorOptions
+        const constructorId = await registry.registerSettings(
+          this.hre.config.environment.settings
         );
 
         console.log('deploying', config.name);
@@ -766,6 +776,44 @@ export class Environment {
         console.error('configure failed for', config.name, ' - ', e.message);
         passing[config.id] = false;
       }
+    }
+  }
+
+  _updateSettings(newSettings: EnvironmentSettings) {
+    this._settings = Object.freeze(JSON.parse(JSON.stringify(newSettings)));
+  }
+
+  private async _prepareSettings(
+    stage: 'initialize' | 'configure' | 'finalize',
+    passing?: Record<string, boolean>
+  ) {
+    const configs = await this.configs;
+
+    for (const config of configs) {
+      if (passing && !passing[config.id]) {
+        continue;
+      }
+
+      let result: EnvironmentSettings | undefined;
+      switch (stage) {
+        case 'initialize':
+          result = await config.prepareInitialize?.call(
+            await this._createContext(config)
+          );
+          break;
+        case 'configure':
+          result = await config.prepareConfigure?.call(
+            await this._createContext(config)
+          );
+          break;
+        case 'finalize':
+          result = await config.prepareFinalize?.call(
+            await this._createContext(config)
+          );
+          break;
+      }
+
+      if (result) this._updateSettings(result);
     }
   }
 }
