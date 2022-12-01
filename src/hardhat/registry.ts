@@ -21,9 +21,9 @@ export interface DeploymentInfo {
   hash: string;
   block: BigNumber;
   timestamp: BigNumber;
-  lastConfigureOptions: string;
-  constructOptions: string;
-  initializeOptions: string;
+  lastConfigureSettings: string;
+  constructSettings: string;
+  initializeSettings: string;
 }
 
 export class Registry {
@@ -109,10 +109,10 @@ export class Registry {
         hash: decoded.hash,
         block: decoded.block,
         timestamp: decoded.timestamp,
-        lastConfigureOptions: decoded.lastConfigureOptions,
-        constructOptions: decoded.constructOptions,
-        initializeOptions: decoded.initializeOptions,
-      };
+        lastConfigureSettings: decoded.lastConfiguredSettings,
+        constructSettings: decoded.constructSettings,
+        initializeSettings: decoded.initializeSettings,
+      } as DeploymentInfo;
       return results;
     }, {} as Record<keyof T, DeploymentInfo>);
 
@@ -135,7 +135,7 @@ export class Registry {
     const id = keccak256(bytes);
 
     try {
-      await registry.submitOptions(bytes).then(wait);
+      await registry.registerSettings(bytes).then(wait);
       console.log('submitted options');
     } catch (e) {
       console.log('options already submitted');
@@ -156,7 +156,7 @@ export class Registry {
 
     const checks = await Promise.all(
       ids.map(async id => {
-        return registry.options(id).catch(() => undefined);
+        return registry.settings(id).catch(() => undefined);
       })
     );
 
@@ -167,7 +167,7 @@ export class Registry {
       if (!checks[i]) {
         optionIds.push(id);
         calls.push(
-          registry.interface.encodeFunctionData('submitOptions', [bytes])
+          registry.interface.encodeFunctionData('registerSettings', [bytes])
         );
       }
     }
@@ -181,7 +181,7 @@ export class Registry {
     debug('initialized', address, optionsId);
     if (this.pendingDeployments[address]) {
       this.pendingDeployments[address].initialized = true;
-      this.pendingDeployments[address].initializeOptions = optionsId;
+      this.pendingDeployments[address].initializeSettings = optionsId;
     } else {
       this.pendingCalls.push({
         test: () => this.contract.callStatic.initialized(address, optionsId),
@@ -200,7 +200,7 @@ export class Registry {
   setConfigured(address: string, optionsId: BytesLike) {
     debug('configured', address, optionsId);
     if (this.pendingDeployments[address]) {
-      this.pendingDeployments[address].lastConfigureOptions = optionsId;
+      this.pendingDeployments[address].lastConfiguredSettings = optionsId;
     } else {
       this.pendingCalls.push({
         test: () => this.contract.callStatic.configured(address, optionsId),
@@ -216,7 +216,7 @@ export class Registry {
     }
   }
 
-  async setDeploymentInfo(contract: Contract, optionsId: BytesLike) {
+  async setDeploymentInfo(contract: Contract, settingsId: BytesLike) {
     debug(
       'contract',
       contract.address,
@@ -243,10 +243,10 @@ export class Registry {
       block: block.number,
       timestamp: block.timestamp,
       owner: await this.contract.signer.getAddress(),
-      constructOptions: optionsId,
-      initializeOptions: constants.HashZero,
+      constructSettings: settingsId,
+      initializeSettings: constants.HashZero,
       initialized: false,
-      lastConfigureOptions: constants.HashZero,
+      lastConfiguredSettings: constants.HashZero,
     };
   }
 }
