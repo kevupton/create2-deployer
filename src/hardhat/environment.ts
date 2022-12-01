@@ -192,10 +192,24 @@ export class Environment {
     );
 
     this._dependencies = Promise.all(
-      // eslint-disable-next-line node/no-unsupported-features/es-syntax
-      matches.map(match => import(path.join(match)))
+      matches.map(async match => ({
+        // eslint-disable-next-line node/no-unsupported-features/es-syntax
+        imported: await import(path.join(match)),
+        path: match,
+      }))
     )
-      .then(results => results.map(value => value.default))
+      .then(results =>
+        results
+          .map(({imported, path}) => {
+            if (!imported.default) {
+              console.error(
+                `Config missing default export. ${path}.\nEach config should default export the DependencyConfig.`
+              );
+            }
+            return imported.default;
+          })
+          .filter(Boolean)
+      )
       .catch(e => {
         debug('failed fetching dependencies', e.message);
         return [];
