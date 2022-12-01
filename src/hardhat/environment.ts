@@ -186,11 +186,15 @@ export class Environment {
     }
 
     const matches = glob.sync(
-      path.join(this.hre.config.environment.path, '*.config.ts')
+      path
+        .join(this.hre.config.environment.path, '*.config.ts')
+        .replace(/\\/g, '/')
     );
 
-    // eslint-disable-next-line node/no-unsupported-features/es-syntax
-    this._dependencies = Promise.all(matches.map(match => import(match)))
+    this._dependencies = Promise.all(
+      // eslint-disable-next-line node/no-unsupported-features/es-syntax
+      matches.map(match => import(path.join(match)))
+    )
       .then(results => results.map(value => value.default))
       .catch(e => {
         debug('failed fetching dependencies', e.message);
