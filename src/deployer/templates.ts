@@ -25,9 +25,9 @@ import {
 } from 'ethers/lib/utils';
 import {Create2Deployer} from '../../typechain-types';
 import {debug} from '../utils';
-import Safe from '@gnosis.pm/safe-core-sdk';
+import Safe from '@safe-global/safe-core-sdk';
 import {getAdminAddress} from '@openzeppelin/upgrades-core/src/eip-1967';
-import SafeServiceClient from '@gnosis.pm/safe-service-client';
+import SafeServiceClient from '@safe-global/safe-service-client';
 
 export type FunctionName<T extends Contract> =
   keyof T['interface']['functions'];

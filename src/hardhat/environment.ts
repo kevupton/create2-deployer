@@ -18,8 +18,8 @@ import {glob} from 'glob';
 import path from 'path';
 import {ContractFromFactory, Deployer, DeployOptions} from '../deployer';
 import {hexDataLength} from 'ethers/lib/utils';
-import Safe from '@gnosis.pm/safe-core-sdk';
-import EthersAdapter from '@gnosis.pm/safe-ethers-lib';
+import Safe from '@safe-global/safe-core-sdk';
+import EthersAdapter from '@safe-global/safe-ethers-lib';
 import {ProxyAdmin__factory, UpgradeableBeacon__factory} from '../proxies';
 import {getAdminAddress} from '@openzeppelin/upgrades-core';
 
@@ -561,7 +561,7 @@ export class Environment {
               safe = await Safe.create({
                 ethAdapter: new EthersAdapter({
                   ethers,
-                  signer: proxyAdmin.signer,
+                  signerOrProvider: proxyAdmin.signer,
                 }),
                 safeAddress: owner,
               });
@@ -668,7 +668,10 @@ export class Environment {
     if (hexDataLength(code) > 0) {
       safe = await Safe.create({
         safeAddress: owner,
-        ethAdapter: new EthersAdapter({ethers, signer: deployer.signer}),
+        ethAdapter: new EthersAdapter({
+          ethers,
+          signerOrProvider: deployer.signer,
+        }),
       });
     }
 
