@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.9;
+pragma solidity =0.8.9;
 
 import 'forge-std/Test.sol';
-
-import '../contracts/Create2Deployer.sol';
+import '../Create2Deployer.sol';
 
 // Create2Deployer foundry contract
 // USAGE: contract TestContract is Create2DeployerHelper(0x... , 0)
 contract TestDeployer is Test {
-    address internal constant CREATE2_DEPLOYER_ADDRESS = 0x07C25C3fcFb51B24Cf325769Ea2E381A309930E2;
+    address internal constant CREATE2_DEPLOYER_ADDRESS =
+        0x07C25C3fcFb51B24Cf325769Ea2E381A309930E2;
 
     uint256 internal immutable defaultSalt;
     Create2Deployer internal immutable create2Deployer;
@@ -25,13 +25,13 @@ contract TestDeployer is Test {
     }
 
     function deploy(string memory name) internal returns (address addr) {
-        return deploy(name, "", defaultSalt);
+        return deploy(name, '', defaultSalt);
     }
 
-    function deploy(
-        string memory name,
-        bytes memory args
-    ) internal returns (address addr) {
+    function deploy(string memory name, bytes memory args)
+        internal
+        returns (address addr)
+    {
         return deploy(name, args, defaultSalt);
     }
 
@@ -40,15 +40,16 @@ contract TestDeployer is Test {
         bytes memory args,
         uint256 salt
     ) internal returns (address addr) {
-        Create2Deployer.FunctionCall[] memory calls = new Create2Deployer.FunctionCall[](0);
+        Create2Deployer.FunctionCall[]
+            memory calls = new Create2Deployer.FunctionCall[](0);
         return deploy(name, args, salt, calls);
     }
 
-    function deploy(
-        string memory name,
-        uint256 salt
-    ) internal returns (address addr) {
-        return deploy(name, "", salt);
+    function deploy(string memory name, uint256 salt)
+        internal
+        returns (address addr)
+    {
+        return deploy(name, '', salt);
     }
 
     function deploy(
@@ -63,7 +64,7 @@ contract TestDeployer is Test {
         string memory name,
         Create2Deployer.FunctionCall[] memory calls
     ) internal returns (address addr) {
-        return deploy(name, "", calls);
+        return deploy(name, '', calls);
     }
 
     function deploy(
@@ -71,7 +72,7 @@ contract TestDeployer is Test {
         uint256 salt,
         Create2Deployer.FunctionCall[] memory calls
     ) internal returns (address addr) {
-        return deploy(name, "", salt, calls);
+        return deploy(name, '', salt, calls);
     }
 
     function deploy(
@@ -86,27 +87,51 @@ contract TestDeployer is Test {
         }
     }
 
-    function factoryAddress(string memory name) internal view returns (address addr) {
-        return factoryAddress(name, "");
+    function factoryAddress(string memory name)
+        internal
+        view
+        returns (address addr)
+    {
+        return factoryAddress(name, '');
     }
 
-    function factoryAddress(string memory name, bytes memory args) internal view returns (address addr) {
+    function factoryAddress(string memory name, bytes memory args)
+        internal
+        view
+        returns (address addr)
+    {
         return factoryAddress(name, args, defaultSalt);
     }
 
-    function factoryAddress(string memory name, uint256 salt) internal view returns (address addr) {
-        return factoryAddress(name, "", salt);
+    function factoryAddress(string memory name, uint256 salt)
+        internal
+        view
+        returns (address addr)
+    {
+        return factoryAddress(name, '', salt);
     }
 
-    function factoryAddress(string memory name, bytes memory args, uint256 salt) internal view returns (address addr) {
+    function factoryAddress(
+        string memory name,
+        bytes memory args,
+        uint256 salt
+    ) internal view returns (address addr) {
         return deployAddress(_bytecode(name, args), salt);
     }
 
-    function deployAddress(bytes memory bytecode) internal view returns (address addr) {
+    function deployAddress(bytes memory bytecode)
+        internal
+        view
+        returns (address addr)
+    {
         return deployAddress(bytecode, defaultSalt);
     }
 
-    function deployAddress(bytes memory bytecode, uint256 salt) internal pure returns (address addr) {
+    function deployAddress(bytes memory bytecode, uint256 salt)
+        internal
+        pure
+        returns (address addr)
+    {
         bytes32 hash = keccak256(
             abi.encodePacked(
                 bytes1(0xff),
@@ -117,10 +142,14 @@ contract TestDeployer is Test {
         );
 
         // NOTE: cast last 20 bytes of hash to address
-        return address(uint160(uint(hash)));
+        return address(uint160(uint256(hash)));
     }
 
-    function _bytecode(string memory name, bytes memory args) private view returns (bytes memory) {
+    function _bytecode(string memory name, bytes memory args)
+        private
+        view
+        returns (bytes memory)
+    {
         return abi.encodePacked(vm.getCode(name), args);
     }
 }
