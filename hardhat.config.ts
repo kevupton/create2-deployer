@@ -33,7 +33,6 @@ const config: HardhatUserConfig = {
         exported: true,
         exportedAs: 'proxies',
       },
-      {src: 'contracts', dest: 'contracts', exported: true},
       {src: 'foundry', dest: 'foundry', exported: true},
     ],
   },
