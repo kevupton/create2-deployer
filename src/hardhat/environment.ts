@@ -349,7 +349,7 @@ export class Environment {
       }
     }
 
-    debug('loaded configuration', {configs, addressSuite});
+    debug('loaded configuration', addressSuite);
     return {configs, addressSuite};
   }
 
@@ -407,7 +407,8 @@ export class Environment {
         continue;
       }
 
-      debug('deployment info', config.name, deploymentInfo[config.id]);
+      if (config.initialize)
+        debug('deployment info', config.name, deploymentInfo[config.id]);
 
       if (!deploymentInfo[config.id].initialized && config.initialize) {
         try {
@@ -836,7 +837,7 @@ export class Environment {
         if (result) this._updateSettings(result);
       } catch (e: any) {
         console.error('error preparing ' + stage, config.name, e.message);
-        if (passing) delete passing[config.id];
+        if (passing) passing[config.id] = false;
       }
     }
   }
