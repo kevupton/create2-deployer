@@ -1,5 +1,5 @@
 import {ethers, run} from 'hardhat';
-import {CREATE2_DEPLOYER_ADDRESS, Deployer} from '../src/utils';
+import {CREATE2_DEPLOYER_ADDRESS, Deployer} from '../src/deployer';
 
 async function main() {
   const [signer] = await ethers.getSigners();
