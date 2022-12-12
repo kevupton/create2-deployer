@@ -94,7 +94,6 @@ export class Environment {
     this._ready = this._loadConfigurations('initialize');
     await this._prepareSettings('initialize');
     const passing = await this._initialize(registry);
-    await this._prepareConfig(passing);
 
     this._ready = this._loadConfigurations('configure');
     await this._prepareSettings('configure', passing);
@@ -302,6 +301,8 @@ export class Environment {
     const configs = await this.configs;
     const roles = await this._createRoleManager(configs);
 
+    debug('granting roles...');
+
     for (const config of configs) {
       const contract = this._contracts[config.id];
 
@@ -331,6 +332,8 @@ export class Environment {
     const configs: ContractConfigurationWithId[] = [];
     const addressSuite: Record<string, string> = {};
 
+    debug('loading config...');
+
     for (const {config} of await this._loadDependencies(key)) {
       try {
         configs.push(
@@ -345,6 +348,7 @@ export class Environment {
       }
     }
 
+    debug('loaded configuration', {configs, addressSuite});
     return {configs, addressSuite};
   }
 
@@ -354,6 +358,9 @@ export class Environment {
       this.deployer,
       this.addresses,
     ]);
+
+    debug('deploying...');
+
     const constructorId = await registry.registerSettings(
       this.hre.config.environment.settings
     );
@@ -380,6 +387,8 @@ export class Environment {
       this.addresses,
     ]);
 
+    debug('initializing...');
+
     const deploymentInfo = await registry.deploymentInfo(addresses);
     const constructorId = await registry.registerSettings(
       this.hre.config.environment.settings
@@ -396,6 +405,8 @@ export class Environment {
         passing[config.id] = false;
         continue;
       }
+
+      debug('deployment info', config.name, deploymentInfo[config.id]);
 
       if (!deploymentInfo[config.id].initialized && config.initialize) {
         try {
@@ -427,33 +438,12 @@ export class Environment {
     return passing;
   }
 
-  private async _prepareConfig(passing: Record<string, boolean>) {
-    const configs = await this.configs;
-    for (const config of configs) {
-      if (passing[config.id] && config.prepareInitialize) {
-        try {
-          console.log('preparing config', config.name);
-          // TODO this one does not do anything at this point in time.
-          await config.prepareInitialize.call(
-            await this._createContext(config)
-          );
-        } catch (e: any) {
-          console.error(
-            'prepareConfig failed for',
-            config.name,
-            '-',
-            e.message
-          );
-        }
-      }
-    }
-  }
-
   private async _configure(
     passing: Record<string, boolean>,
     registry: Registry
   ) {
     const [configs] = await Promise.all([this.configs]);
+    debug('configuring...');
 
     const configureId = await registry.registerSettings(
       this.hre.config.environment.settings
@@ -467,6 +457,8 @@ export class Environment {
   private async _finalize(passing: Record<string, boolean>) {
     const [configs] = await Promise.all([this.configs]);
     const deployer = await this.deployer;
+
+    debug('finalizing...', passing);
 
     for (const config of configs) {
       if (config.finalize) {
@@ -525,6 +517,7 @@ export class Environment {
     let address: string;
 
     if ('proxy' in config) {
+      debug('deployment is a proxy');
       address = this._getProxyAddress(deployer, config);
 
       let options: DeployOptions | undefined;
@@ -809,32 +802,41 @@ export class Environment {
     passing?: Record<string, boolean>
   ) {
     const configs = await this.configs;
+    debug('preparing settings for ' + stage, passing);
 
     for (const config of configs) {
       if (passing && !passing[config.id]) {
         continue;
       }
 
-      let result: EnvironmentSettings | undefined;
-      switch (stage) {
-        case 'initialize':
-          result = await config.prepareInitialize?.call(
-            await this._createContext(config)
-          );
-          break;
-        case 'configure':
-          result = await config.prepareConfigure?.call(
-            await this._createContext(config)
-          );
-          break;
-        case 'finalize':
-          result = await config.prepareFinalize?.call(
-            await this._createContext(config)
-          );
-          break;
-      }
+      try {
+        let result: EnvironmentSettings | undefined;
+        switch (stage) {
+          case 'initialize':
+            console.log('preparing ' + stage + ' for ' + config.name);
+            result = await config.prepareInitialize?.call(
+              await this._createContext(config)
+            );
+            break;
+          case 'configure':
+            console.log('preparing ' + stage + ' for ' + config.name);
+            result = await config.prepareConfigure?.call(
+              await this._createContext(config)
+            );
+            break;
+          case 'finalize':
+            console.log('preparing ' + stage + ' for ' + config.name);
+            result = await config.prepareFinalize?.call(
+              await this._createContext(config)
+            );
+            break;
+        }
 
-      if (result) this._updateSettings(result);
+        if (result) this._updateSettings(result);
+      } catch (e: any) {
+        console.error('error preparing ' + stage, config.name, e.message);
+        if (passing) delete passing[config.id];
+      }
     }
   }
 }

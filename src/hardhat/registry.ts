@@ -51,6 +51,8 @@ export class Registry {
     const pendingCalls = this.pendingCalls;
     this.pendingCalls = [];
 
+    debug('syncing registry...');
+
     Object.entries(this.pendingDeployments).forEach(([key, value]) => {
       pendingCalls.push({
         test: async () => this.contract.callStatic.register(key, value),
@@ -133,6 +135,8 @@ export class Registry {
 
     const bytes = toUtf8Bytes(JSON.stringify(options));
     const id = keccak256(bytes);
+
+    debug('registering settings ', id);
 
     try {
       await registry.registerSettings(bytes).then(wait);
