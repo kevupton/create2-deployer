@@ -310,6 +310,7 @@ export class Environment {
         console.error('missing contract for', config.name);
       }
 
+      debug('checking', config.name, !!config.requiredRoles);
       if (config.requiredRoles && contract) {
         try {
           console.log('granting-roles', config.name);
@@ -598,18 +599,18 @@ export class Environment {
 
     this._contracts[config.id] = contract;
 
-    if (contract.deployTransaction) {
-      try {
-        await config.deployed?.call(await this._createContext(config));
-      } catch (e: any) {
-        console.error(
-          'event handler "deployed" failed for',
-          config.name,
-          ' - ',
-          e.message
-        );
-      }
+    // if (contract.deployTransaction) {
+    try {
+      await config.deployed?.call(await this._createContext(config));
+    } catch (e: any) {
+      console.error(
+        'event handler "deployed" failed for',
+        config.name,
+        ' - ',
+        e.message
+      );
     }
+    // }
 
     return contract;
   }
