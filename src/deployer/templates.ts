@@ -69,7 +69,7 @@ export function makeTemplates(deployer: Deployer) {
       return deployer.deploy(templates.proxyAdminFactory, {
         calls: [
           transferOwnership(
-            templates.proxyAdminAddress,
+            templates.proxyAdminAddress(salt),
             deployer.signer.address
           ),
         ],
@@ -77,9 +77,10 @@ export function makeTemplates(deployer: Deployer) {
         overrides,
       });
     },
-    proxyAdminAddress: Deployer.factoryAddress(new ProxyAdmin__factory(), {
-      salt: deployer.signer.address,
-    }),
+    proxyAdminAddress: (salt?: BigNumberish) =>
+      Deployer.factoryAddress(new ProxyAdmin__factory(), {
+        salt: salt ?? deployer.signer.address,
+      }),
     transparentUpgradeableProxy: async <T extends Contract>(
       id: string,
       implementation: T,
