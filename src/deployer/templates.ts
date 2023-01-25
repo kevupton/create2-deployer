@@ -18,7 +18,6 @@ import {Placeholder__factory} from '../../typechain-types/factories/contracts/Pl
 import {
   defaultAbiCoder,
   hexConcat,
-  hexDataLength,
   Interface,
   keccak256,
   toUtf8Bytes,
@@ -26,7 +25,6 @@ import {
 import {Create2Deployer} from '../../typechain-types';
 import {debug} from '../utils';
 import Safe from '@safe-global/safe-core-sdk';
-import {getAdminAddress} from '@openzeppelin/upgrades-core/src/eip-1967';
 import SafeServiceClient from '@safe-global/safe-service-client';
 
 export type FunctionName<T extends Contract> =
@@ -40,7 +38,7 @@ export interface FunctionCall<T extends Contract> {
 export interface ProxyOptions<T extends Contract = Contract> {
   salt?: BigNumberish;
   overrides?: Overrides;
-  proxyAdmin?: ProxyAdmin;
+  proxyAdmin?: ProxyAdmin | string;
   upgradeCall?: FunctionCall<T> | FunctionName<T>;
   initializer?: FunctionCall<T> | FunctionName<T>;
   multisig?: Safe;
@@ -67,7 +65,7 @@ export function makeTemplates(deployer: Deployer) {
         overrides,
       }),
     placeholderAddress: PLACEHOLDER_ADDRESS,
-    proxyAdmin: async (overrides?: Overrides) => {
+    proxyAdmin: async (salt?: BigNumberish, overrides?: Overrides) => {
       return deployer.deploy(templates.proxyAdminFactory, {
         calls: [
           transferOwnership(
@@ -75,7 +73,7 @@ export function makeTemplates(deployer: Deployer) {
             deployer.signer.address
           ),
         ],
-        salt: deployer.signer.address,
+        salt: salt ?? deployer.signer.address,
         overrides,
       });
     },
@@ -95,6 +93,11 @@ export function makeTemplates(deployer: Deployer) {
       }: ProxyOptions<T> = {}
     ) => {
       proxyAdmin = proxyAdmin ?? (await templates.proxyAdmin());
+
+      if (typeof proxyAdmin === 'string') {
+        // then proxy admin is the salt of the proxy admin
+        proxyAdmin = await templates.proxyAdmin(proxyAdmin);
+      }
 
       await proxyAdmin.deployed();
       await implementation.deployed();
