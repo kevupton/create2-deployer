@@ -96,7 +96,9 @@ export function makeTemplates(deployer: Deployer) {
 
       if (typeof proxyAdmin === 'string') {
         // then proxy admin is the salt of the proxy admin
-        proxyAdmin = await templates.proxyAdmin(proxyAdmin);
+        proxyAdmin = await templates.proxyAdmin(
+          templates.proxySalt(proxyAdmin.toLowerCase(), salt)
+        );
       }
 
       await proxyAdmin.deployed();
@@ -240,7 +242,7 @@ export function makeTemplates(deployer: Deployer) {
     ) => {
       return deployer.deploy(templates.beaconProxyFactory, {
         args: [beaconAddress, '0x'],
-        salt: templates.proxySalt(id, salt),
+        salt: templates.proxySalt(id?.toLowerCase(), salt),
         overrides,
       });
     },
@@ -273,7 +275,7 @@ export function makeTemplates(deployer: Deployer) {
     },
     upgradeableBeaconAddress: (id?: string, salt?: BigNumberish) =>
       Deployer.factoryAddress(templates.upgradeableBeaconFactory, {
-        salt: templates.proxySalt(id, salt),
+        salt: templates.proxySalt(id?.toLowerCase(), salt),
         args: [PLACEHOLDER_ADDRESS],
       }),
     erc1967Proxy: async (salt?: BigNumberish, overrides?: Overrides) => {
