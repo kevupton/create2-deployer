@@ -10,6 +10,7 @@ import '../Create2Deployer.sol';
 contract TestDeployer is Test {
     address internal constant CREATE2_DEPLOYER_ADDRESS =
         0x07C25C3fcFb51B24Cf325769Ea2E381A309930E2;
+    address internal immutable PLACEHOLDER_ADDRESS;
 
     uint256 internal immutable defaultSalt;
     Create2Deployer internal immutable create2Deployer;
@@ -22,7 +23,7 @@ contract TestDeployer is Test {
         create2Deployer = Create2Deployer(CREATE2_DEPLOYER_ADDRESS);
 
         // deploy the placeholder factory
-        deploy("Placeholder");
+        PLACEHOLDER_ADDRESS = deploy("Placeholder");
 
         defaultSalt = _defaultSalt;
     }
