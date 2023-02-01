@@ -6,7 +6,10 @@ import {
 } from 'hardhat/builtin-tasks/task-names';
 import {getAddress, hexConcat, keccak256} from 'ethers/lib/utils';
 import * as fs from 'fs';
-import {Create2Deployer__factory} from '../../typechain-types';
+import {
+  Create2Deployer__factory,
+  Placeholder__factory,
+} from '../../typechain-types';
 import {CREATE2_DEPLOYER_ADDRESS, Deployer} from '../deployer';
 import {debug} from '../utils';
 
@@ -122,8 +125,14 @@ task(TASK_TEST_SETUP_TEST_ENVIRONMENT).setAction(
     ]);
 
     const deployer = new Deployer(signer);
+    const placeholder = await deployer.deploy(
+      new Placeholder__factory(signer),
+      {
+        salt: 0,
+      }
+    );
 
-    await deployer.templates.placeholder;
+    await placeholder.deployed();
 
     console.log('Create2 Deployer Setup');
   }

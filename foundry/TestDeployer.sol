@@ -21,6 +21,9 @@ contract TestDeployer is Test {
         vm.etch(CREATE2_DEPLOYER_ADDRESS, code);
         create2Deployer = Create2Deployer(CREATE2_DEPLOYER_ADDRESS);
 
+        // deploy the placeholder factory
+        deploy("Placeholder");
+
         defaultSalt = _defaultSalt;
     }
 
