@@ -1,5 +1,6 @@
 import {ethers, run} from 'hardhat';
 import {CREATE2_DEPLOYER_ADDRESS, Deployer} from '../src/deployer';
+import {Placeholder__factory} from '../typechain-types';
 
 async function main() {
   const [signer] = await ethers.getSigners();
@@ -20,9 +21,11 @@ async function main() {
 
   const deployer = new Deployer(signer);
 
-  const placeholder = await deployer.templates.placeholder();
-  console.log('placeholder', placeholder.address);
+  const placeholder = await deployer.deploy(new Placeholder__factory(signer), {
+    salt: 0,
+  });
   await placeholder.deployed();
+  console.log('placeholder', placeholder.address);
 
   await new Promise(res => setTimeout(res, 10000));
   console.log('verifying...');
@@ -30,6 +33,9 @@ async function main() {
   await Promise.all([
     run('verify:verify', {
       address: placeholder.address,
+    }).catch(e => console.error(e.message)),
+    run('verify:verify', {
+      address: CREATE2_DEPLOYER_ADDRESS,
     }).catch(e => console.error(e.message)),
     run('verify:verify', {
       address: CREATE2_DEPLOYER_ADDRESS,

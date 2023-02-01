@@ -44,6 +44,8 @@ export interface ProxyOptions<T extends Contract = Contract> {
   multisig?: Safe;
 }
 
+export const PLACEHOLDER_ADDRESS = '0xa1e70010986a3347d0d280957829325fc5dac5ad';
+
 export function makeTemplates(deployer: Deployer) {
   const PLACEHOLDER_ADDRESS = Deployer.factoryAddress(
     new Placeholder__factory()
@@ -59,11 +61,10 @@ export function makeTemplates(deployer: Deployer) {
       new TransparentUpgradeableProxy__factory(deployer.signer),
     erc1967ProxyFactory: new ERC1967Proxy__factory(deployer.signer),
 
-    placeholder: async (overrides?: Overrides) =>
-      deployer.deploy(templates.placeholderFactory, {
-        salt: 0,
-        overrides,
-      }),
+    placeholder: Placeholder__factory.connect(
+      PLACEHOLDER_ADDRESS,
+      deployer.signer
+    ),
     placeholderAddress: PLACEHOLDER_ADDRESS,
     proxyAdmin: async (salt?: BigNumberish, overrides?: Overrides) => {
       return deployer.deploy(templates.proxyAdminFactory, {

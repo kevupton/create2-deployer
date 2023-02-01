@@ -6,11 +6,16 @@ import "@openzeppelin/contracts/utils/Address.sol";
 
 contract Placeholder {
 
-    event Result(bytes data);
+    event Result(bool success, bytes data);
 
-    fallback() external payable {
-        (address target, bytes memory data) = abi.decode(msg.data, (address, bytes));
-        bytes memory result = Address.functionCallWithValue(target, data, msg.value);
-        emit Result(result);
+    fallback(bytes calldata data) external payable returns (bytes memory) {
+        if (data.length > 32) {
+            (address target, bytes memory _calldata) = abi.decode(data, (address, bytes));
+            (bool success, bytes memory returndata) = target.call{value: msg.value}(_calldata);
+            emit Result(success, returndata);
+        } else {
+            return abi.encode(address(this));
+        }
+        return '';
     }
 }
