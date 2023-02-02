@@ -3,6 +3,7 @@
 pragma solidity =0.8.9;
 
 import 'forge-std/Test.sol';
+import '../constants.sol';
 import '../Create2Deployer.sol';
 import '../Placeholder.sol';
 import '../DeploymentRegistry.sol';
