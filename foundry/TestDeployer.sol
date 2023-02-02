@@ -4,6 +4,7 @@ pragma solidity =0.8.9;
 
 import 'forge-std/Test.sol';
 import '../Create2Deployer.sol';
+import '../Placeholder.sol';
 
 // Create2Deployer foundry contract
 // USAGE: contract TestContract is Create2DeployerHelper(0x... , 0)
@@ -23,7 +24,7 @@ contract TestDeployer is Test {
         create2Deployer = Create2Deployer(CREATE2_DEPLOYER_ADDRESS);
 
         // deploy the placeholder factory
-        PLACEHOLDER_ADDRESS = deploy("Placeholder");
+        PLACEHOLDER_ADDRESS = new Placeholder();
 
         defaultSalt = _defaultSalt;
     }
