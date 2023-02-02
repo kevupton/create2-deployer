@@ -9,12 +9,11 @@ import '../Placeholder.sol';
 // Create2Deployer foundry contract
 // USAGE: contract TestContract is Create2DeployerHelper(0x... , 0)
 contract TestDeployer is Test {
-    address internal constant CREATE2_DEPLOYER_ADDRESS =
-        0x07C25C3fcFb51B24Cf325769Ea2E381A309930E2;
-    address internal immutable PLACEHOLDER_ADDRESS;
 
     uint256 internal immutable defaultSalt;
+
     Create2Deployer internal immutable create2Deployer;
+    Placeholder internal immutable placeholder;
 
     constructor(uint256 _defaultSalt) {
         // setup the create2 deployer at a specific address
@@ -23,8 +22,11 @@ contract TestDeployer is Test {
         vm.etch(CREATE2_DEPLOYER_ADDRESS, code);
         create2Deployer = Create2Deployer(CREATE2_DEPLOYER_ADDRESS);
 
-        // deploy the placeholder factory
-        PLACEHOLDER_ADDRESS = address(new Placeholder());
+        // deploy the placeholder at a specific address
+        Placeholder placeholderInstance = new Placeholder();
+        code = address(placeholderInstance).code;
+        vm.etch(PLACEHOLDER_ADDRESS, code);
+        placeholder = Placeholder(PLACEHOLDER_ADDRESS);
 
         defaultSalt = _defaultSalt;
     }
