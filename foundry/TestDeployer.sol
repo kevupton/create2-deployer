@@ -24,7 +24,7 @@ contract TestDeployer is Test {
         create2Deployer = Create2Deployer(CREATE2_DEPLOYER_ADDRESS);
 
         // deploy the placeholder factory
-        PLACEHOLDER_ADDRESS = new Placeholder();
+        PLACEHOLDER_ADDRESS = address(new Placeholder());
 
         defaultSalt = _defaultSalt;
     }
