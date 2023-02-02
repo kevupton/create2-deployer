@@ -22,6 +22,7 @@ import {Create2Deployer} from '../../typechain-types/contracts/Create2Deployer';
 import {JsonRpcSigner} from '@ethersproject/providers';
 import {Create2Deployer__factory} from '../../typechain-types';
 import {PromiseOrValue} from '../../typechain-types/common';
+import {CREATE2_DEPLOYER_ADDRESS} from './constants';
 
 export type Head<T extends unknown[]> = T extends [
   ...other: infer Head,
@@ -60,9 +61,6 @@ export interface CreateTemplateOptions<T extends ContractFactory> {
 
 export type ContractFromFactory<T extends ContractFactory = ContractFactory> =
   Awaited<ReturnType<T['deploy']>>;
-
-export const CREATE2_DEPLOYER_ADDRESS =
-  '0x07C25C3fcFb51B24Cf325769Ea2E381A309930E2';
 
 export class Deployer {
   public readonly provider = this.signer.provider!;

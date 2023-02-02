@@ -44,8 +44,6 @@ export interface ProxyOptions<T extends Contract = Contract> {
   multisig?: Safe;
 }
 
-export const PLACEHOLDER_ADDRESS = '0xa1e70010986a3347d0d280957829325fc5dac5ad';
-
 export function makeTemplates(deployer: Deployer) {
   const PLACEHOLDER_ADDRESS = Deployer.factoryAddress(
     new Placeholder__factory()

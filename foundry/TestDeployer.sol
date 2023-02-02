@@ -5,6 +5,7 @@ pragma solidity =0.8.9;
 import 'forge-std/Test.sol';
 import '../Create2Deployer.sol';
 import '../Placeholder.sol';
+import '../DeploymentRegistry.sol';
 
 // Create2Deployer foundry contract
 // USAGE: contract TestContract is Create2DeployerHelper(0x... , 0)
@@ -14,6 +15,7 @@ contract TestDeployer is Test {
 
     Create2Deployer internal immutable create2Deployer;
     Placeholder internal immutable placeholder;
+    DeploymentRegistry internal immutable deploymentRegistry;
 
     constructor(uint256 _defaultSalt) {
         // setup the create2 deployer at a specific address
@@ -27,6 +29,12 @@ contract TestDeployer is Test {
         code = address(placeholderInstance).code;
         vm.etch(PLACEHOLDER_ADDRESS, code);
         placeholder = Placeholder(PLACEHOLDER_ADDRESS);
+
+        // deploy the placeholder at a specific address
+        DeploymentRegistry deploymentRegistry = new DeploymentRegistry();
+        code = address(deploymentRegistry).code;
+        vm.etch(DEPLOYMENT_REGISTRY_ADDRESS, code);
+        deploymentRegistry = DeploymentRegistry(DEPLOYMENT_REGISTRY_ADDRESS);
 
         defaultSalt = _defaultSalt;
     }

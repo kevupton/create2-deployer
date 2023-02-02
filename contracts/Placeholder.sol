@@ -4,8 +4,6 @@ pragma solidity ^0.8.9;
 
 import "@openzeppelin/contracts/utils/Address.sol";
 
-address constant PLACEHOLDER_ADDRESS = 0xa1E70010986A3347D0D280957829325Fc5dAc5ad;
-
 contract Placeholder {
 
     event Result(bool success, bytes data);

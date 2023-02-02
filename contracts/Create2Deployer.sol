@@ -5,8 +5,6 @@ pragma solidity ^0.8.9;
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
 
-address constant CREATE2_DEPLOYER_ADDRESS = 0x07C25C3fcFb51B24Cf325769Ea2E381A309930E2;
-
 // TODO add a clone method
 contract Create2Deployer {
     using Address for address;
