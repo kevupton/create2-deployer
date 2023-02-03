@@ -11,7 +11,6 @@ import '../DeploymentRegistry.sol';
 // Create2Deployer foundry contract
 // USAGE: contract TestContract is Create2DeployerHelper(0x... , 0)
 contract TestDeployer is Test {
-
     uint256 internal immutable defaultSalt;
 
     Create2Deployer internal immutable create2Deployer;
@@ -32,8 +31,8 @@ contract TestDeployer is Test {
         placeholder = Placeholder(PLACEHOLDER_ADDRESS);
 
         // deploy the placeholder at a specific address
-        DeploymentRegistry deploymentRegistry = new DeploymentRegistry();
-        code = address(deploymentRegistry).code;
+        DeploymentRegistry deploymentRegistryInstance = new DeploymentRegistry();
+        code = address(deploymentRegistryInstance).code;
         vm.etch(DEPLOYMENT_REGISTRY_ADDRESS, code);
         deploymentRegistry = DeploymentRegistry(DEPLOYMENT_REGISTRY_ADDRESS);
 
