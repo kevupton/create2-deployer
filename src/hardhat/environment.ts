@@ -189,7 +189,11 @@ export class Environment {
 
     return deployer.factoryAddress(factory, {
       args: config.deployOptions?.args,
-      salt: this._generateSalt(deployer, config.id, config.deployOptions?.salt),
+      salt: this._generateSalt(
+        deployer,
+        config.deployOptions?.id || config.id,
+        config.deployOptions?.salt
+      ),
     });
   }
 
