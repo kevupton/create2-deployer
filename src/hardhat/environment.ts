@@ -1,4 +1,10 @@
-import {BigNumber, Contract, ContractFactory, ethers} from 'ethers';
+import {
+  BigNumber,
+  BigNumberish,
+  Contract,
+  ContractFactory,
+  ethers,
+} from 'ethers';
 import {
   CallbackContext,
   ConfigOrConstructor,
@@ -8,6 +14,7 @@ import {
   DependencyConfig,
   DetailedDependencies,
   ProxyConfiguration,
+  DeployOptionsWithId,
 } from './types';
 import {camel} from 'case';
 import {Registry} from './registry';
@@ -17,11 +24,17 @@ import {HardhatRuntimeEnvironment} from 'hardhat/types';
 import {glob} from 'glob';
 import path from 'path';
 import {ContractFromFactory, Deployer, DeployOptions} from '../deployer';
-import {hexDataLength} from 'ethers/lib/utils';
+import {
+  hexConcat,
+  hexDataLength,
+  keccak256,
+  toUtf8Bytes,
+} from 'ethers/lib/utils';
 import Safe from '@safe-global/safe-core-sdk';
 import EthersAdapter from '@safe-global/safe-ethers-lib';
 import {ProxyAdmin__factory, UpgradeableBeacon__factory} from '../proxies';
 import {getAdminAddress} from '@openzeppelin/upgrades-core';
+import {address} from 'hardhat/internal/core/config/config-validation';
 
 export class Environment {
   public readonly deployer = (process.env.DEPLOYER
@@ -176,6 +189,7 @@ export class Environment {
 
     return deployer.factoryAddress(factory, {
       args: config.deployOptions?.args,
+      salt: this._generateSalt(deployer, config.id, config.deployOptions?.salt),
     });
   }
 
@@ -517,31 +531,38 @@ export class Environment {
     const factory: T = await this._factory(config.name);
     let contract: ContractFromFactory<T>;
     let address: string;
+    let options: DeployOptionsWithId<T> | undefined;
 
     if ('proxy' in config) {
-      debug('deployment is a proxy');
-      address = this._getProxyAddress(deployer, config);
-
-      let options: DeployOptions | undefined;
       if (typeof config.deployOptions === 'function') {
+        address = this._getProxyAddress(deployer, config);
         const {address: deploymentInfo} = await this.getDeploymentInfo({
           address,
         });
         options = await config.deployOptions(deploymentInfo);
       } else {
+        // to keep typescript happy
         options = config.deployOptions;
       }
-
-      contract = await deployer.deploy<T>(factory, options);
     } else {
-      contract = await deployer.deploy<T>(factory, config.deployOptions);
-      address = contract.address;
+      options = config.deployOptions;
     }
+
+    contract = await deployer.deploy<T>(factory, {
+      ...(options || {}),
+      salt: this._generateSalt(
+        deployer,
+        options?.id || config.id,
+        options?.salt
+      ),
+    });
+    address = contract.address;
 
     await contract.deployed();
     await registry.setDeploymentInfo(contract, constructorId);
 
     if ('proxy' in config) {
+      debug('deployment is a proxy');
       if (config.proxy.type === 'TransparentUpgradeableProxy') {
         let proxyAdmin = await this._getProxyAdmin(address);
         let safe: Safe | undefined;
@@ -840,5 +861,14 @@ export class Environment {
         if (passing) passing[config.id] = false;
       }
     }
+  }
+
+  private _generateSalt(deployer: Deployer, id: string, salt?: BigNumberish) {
+    return keccak256(
+      hexConcat([
+        toUtf8Bytes(id),
+        BigNumber.from(salt || deployer.defaultSalt).toHexString(),
+      ])
+    );
   }
 }

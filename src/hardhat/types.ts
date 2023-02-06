@@ -32,6 +32,12 @@ export interface CallbackContext<T extends ContractFactory = ContractFactory> {
   configure(): Promise<void>;
 }
 
+export interface DeployOptionsWithId<
+  T extends ContractFactory = ContractFactory
+> extends DeployOptions<T> {
+  id?: string;
+}
+
 export interface BaseConfiguration<
   T extends ContractFactory = ContractFactory
 > {
@@ -74,16 +80,16 @@ export interface BaseConfiguration<
 
 export interface DefaultConfiguration<T extends ContractFactory>
   extends BaseConfiguration<T> {
-  deployOptions?: DeployOptions<T>;
+  deployOptions?: DeployOptionsWithId<T>;
 }
 
 export interface ProxyConfiguration<T extends ContractFactory = ContractFactory>
   extends BaseConfiguration<T> {
   deployOptions?:
-    | DeployOptions<T>
+    | DeployOptionsWithId<T>
     | ((
         options: DeploymentInfo
-      ) => DeployOptions<T> | PromiseLike<DeployOptions<T>>);
+      ) => DeployOptionsWithId<T> | PromiseLike<DeployOptionsWithId<T>>);
   proxy:
     | {
         id?: string;
