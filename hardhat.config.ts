@@ -11,7 +11,7 @@ const accounts = PRIVATE_KEY ? [PRIVATE_KEY] : [];
 
 const config: HardhatUserConfig = {
   solidity: {
-    version: '0.8.9',
+    version: '0.8.18',
     settings: {
       optimizer: {
         enabled: true,
@@ -27,12 +27,6 @@ const config: HardhatUserConfig = {
       {src: 'src/deployer', dest: 'deployer', exported: true},
       {src: 'src/utils', dest: 'utils', exported: true},
       {src: 'src/hardhat', dest: 'hardhat'},
-      {
-        src: 'src/proxies',
-        dest: 'proxies',
-        exported: true,
-        exportedAs: 'proxies',
-      },
       {src: 'foundry', dest: 'foundry'},
     ],
   },

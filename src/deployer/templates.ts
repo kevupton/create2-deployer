@@ -2,6 +2,7 @@ import {Deployer} from './deployer';
 import {
   BigNumber,
   BigNumberish,
+  BytesLike,
   Contract,
   ContractFactory,
   Overrides,
@@ -9,11 +10,11 @@ import {
 import {
   BeaconProxy__factory,
   ERC1967Proxy__factory,
-  ProxyAdmin,
   ProxyAdmin__factory,
   TransparentUpgradeableProxy__factory,
   UpgradeableBeacon__factory,
-} from '../proxies';
+} from '../../typechain-types/factories/contracts/proxy';
+import {ProxyAdmin} from '../../typechain-types/contracts/proxy';
 import {Placeholder__factory} from '../../typechain-types/factories/contracts/Placeholder__factory';
 import {
   defaultAbiCoder,
@@ -67,7 +68,7 @@ export function makeTemplates(deployer: Deployer) {
     proxyAdmin: async (salt?: BigNumberish, overrides?: Overrides) => {
       return deployer.deploy(templates.proxyAdminFactory, {
         calls: [
-          transferOwnership(
+          initializeProxyAdmin(
             templates.proxyAdminAddress(salt),
             deployer.signer.address
           ),
@@ -83,6 +84,7 @@ export function makeTemplates(deployer: Deployer) {
     transparentUpgradeableProxy: async <T extends Contract>(
       id: string,
       implementation: T,
+      data: BytesLike = '0x',
       {
         salt,
         overrides,
@@ -111,9 +113,11 @@ export function makeTemplates(deployer: Deployer) {
           args: [PLACEHOLDER_ADDRESS, PLACEHOLDER_ADDRESS, '0x'],
           salt: templates.proxySalt(id.toLowerCase(), salt),
           calls: [
-            changeAdmin(
+            initializeTUProxy(
               templates.transparentUpgradeableProxyAddress(id, salt),
-              proxyAdmin.address
+              implementation.address,
+              proxyAdmin.address,
+              data
             ),
           ],
           overrides,
@@ -229,7 +233,6 @@ export function makeTemplates(deployer: Deployer) {
       return Deployer.factoryAddress(
         templates.transparentUpgradeableProxyFactory,
         {
-          args: [PLACEHOLDER_ADDRESS, PLACEHOLDER_ADDRESS, '0x'],
           salt: templates.proxySalt(id.toLowerCase(), salt),
         }
       );
@@ -237,55 +240,74 @@ export function makeTemplates(deployer: Deployer) {
     beaconProxy: async (
       beaconAddress: string,
       id?: string,
+      data: BytesLike = '0x',
       salt?: BigNumberish,
       overrides?: Overrides
     ) => {
       return deployer.deploy(templates.beaconProxyFactory, {
-        args: [beaconAddress, '0x'],
         salt: templates.proxySalt(id?.toLowerCase(), salt),
+        calls: [
+          initializeBeaconProxy(
+            templates.beaconProxyAddress(id, salt),
+            beaconAddress,
+            data
+          ),
+        ],
         overrides,
       });
     },
-    beaconProxyAddress: async (
-      beaconAddress: string,
-      id?: string,
-      salt?: BigNumberish
-    ) => {
+    beaconProxyAddress: (id?: string, salt?: BigNumberish) => {
       return Deployer.factoryAddress(templates.beaconProxyFactory, {
-        args: [beaconAddress, '0x'],
-        salt,
+        salt: templates.proxySalt(id?.toLowerCase(), salt),
       });
     },
     upgradeableBeacon: async (
+      implementation: string,
+      owner: string,
       id?: string,
       salt?: BigNumberish,
       overrides?: Overrides
     ) => {
       return await deployer.deploy(templates.upgradeableBeaconFactory, {
-        args: [PLACEHOLDER_ADDRESS],
         calls: [
-          transferOwnership(
+          initializeUpgradeableBeacon(
             templates.upgradeableBeaconAddress(id, salt),
-            deployer.address
+            implementation,
+            owner
           ),
         ],
-        salt,
+        salt: templates.proxySalt(id?.toLowerCase(), salt),
         overrides,
       });
     },
     upgradeableBeaconAddress: (id?: string, salt?: BigNumberish) =>
       Deployer.factoryAddress(templates.upgradeableBeaconFactory, {
         salt: templates.proxySalt(id?.toLowerCase(), salt),
-        args: [PLACEHOLDER_ADDRESS],
       }),
-    erc1967Proxy: async (salt?: BigNumberish, overrides?: Overrides) => {
+    erc1967ProxyAddress: (id?: string, salt?: BigNumberish) =>
+      Deployer.factoryAddress(templates.erc1967ProxyFactory, {
+        salt: templates.proxySalt(id?.toLowerCase(), salt),
+      }),
+    erc1967Proxy: async (
+      implementation: string,
+      data: BytesLike = '0x',
+      id?: string,
+      salt?: BigNumberish,
+      overrides?: Overrides
+    ) => {
       return await deployer.deploy(templates.erc1967ProxyFactory, {
-        args: [PLACEHOLDER_ADDRESS, '0x'],
+        calls: [
+          initializeERC1967Proxy(
+            templates.erc1967ProxyAddress(id, salt),
+            implementation,
+            data
+          ),
+        ],
         salt,
         overrides,
       });
     },
-    proxySalt(id = 'default', salt = deployer.defaultSalt) {
+    proxySalt(id = '', salt = deployer.defaultSalt) {
       return keccak256(
         hexConcat([
           toUtf8Bytes(id),
@@ -312,15 +334,72 @@ export function makeTemplates(deployer: Deployer) {
     ]);
   }
 
-  function transferOwnership(
+  function initializeUpgradeableBeacon(
     target: string,
-    account: string
+    implementation: string,
+    owner: string
+  ): Create2Deployer.FunctionCallStruct {
+    return {
+      target,
+      data: UpgradeableBeacon__factory.createInterface().encodeFunctionData(
+        'initialize',
+        [implementation, owner]
+      ),
+    };
+  }
+
+  function initializeProxyAdmin(
+    target: string,
+    owner: string
   ): Create2Deployer.FunctionCallStruct {
     return {
       target,
       data: ProxyAdmin__factory.createInterface().encodeFunctionData(
-        'transferOwnership',
-        [account]
+        'initialize',
+        [owner]
+      ),
+    };
+  }
+
+  function initializeTUProxy(
+    target: string,
+    logic: string,
+    admin: string,
+    data: BytesLike
+  ): Create2Deployer.FunctionCallStruct {
+    return {
+      target,
+      data: TransparentUpgradeableProxy__factory.createInterface().encodeFunctionData(
+        'initialize',
+        [logic, admin, data]
+      ),
+    };
+  }
+
+  function initializeERC1967Proxy(
+    target: string,
+    logic: string,
+    data: BytesLike
+  ): Create2Deployer.FunctionCallStruct {
+    return {
+      target,
+      data: ERC1967Proxy__factory.createInterface().encodeFunctionData(
+        'initialize',
+        [logic, data]
+      ),
+    };
+  }
+
+  function initializeBeaconProxy(
+    target: string,
+    beacon: string,
+    data: BytesLike
+  ): Create2Deployer.FunctionCallStruct {
+    return {
+      target,
+      data: BeaconProxy__factory.createInterface().encodeFunctionData(
+        'initialize',
+        [beacon, data]
       ),
     };
   }

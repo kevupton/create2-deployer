@@ -32,7 +32,10 @@ import {
 } from 'ethers/lib/utils';
 import Safe from '@safe-global/safe-core-sdk';
 import EthersAdapter from '@safe-global/safe-ethers-lib';
-import {ProxyAdmin__factory, UpgradeableBeacon__factory} from '../proxies';
+import {
+  ProxyAdmin__factory,
+  UpgradeableBeacon__factory,
+} from '../../typechain-types';
 import {getAdminAddress} from '@openzeppelin/upgrades-core';
 import {address} from 'hardhat/internal/core/config/config-validation';
 

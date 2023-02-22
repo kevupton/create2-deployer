@@ -4,28 +4,27 @@ import {
   DeploymentRegistry__factory,
   Placeholder__factory,
 } from '../typechain-types';
-import {BigNumber, Overrides} from 'ethers';
-import {parseUnits} from 'ethers/lib/utils';
+import {Overrides} from 'ethers';
 
 async function main() {
   const [signer] = await ethers.getSigners();
-  console.log('singer', signer.address);
+  console.log('signer', signer.address);
 
   const create2DeployerFactory = await ethers.getContractFactory(
     'Create2Deployer'
   );
 
-  if (!CREATE2_DEPLOYER_ADDRESS) {
-    try {
-      const create2Deployer = await create2DeployerFactory.deploy({
-        nonce: 0,
-      });
-      await create2Deployer.deployed();
-      console.log('deployer', create2Deployer.address);
-      console.log(create2Deployer.deployTransaction.hash);
-    } catch (e: any) {
-      // console.error(e.message);
-    }
+  let deployerAddress = CREATE2_DEPLOYER_ADDRESS;
+  try {
+    const create2Deployer = await create2DeployerFactory.deploy({
+      nonce: 0,
+    });
+    await create2Deployer.deployed();
+    console.log('deployer', create2Deployer.address);
+    console.log(create2Deployer.deployTransaction.hash);
+    deployerAddress = create2Deployer.address;
+  } catch (e: any) {
+    // console.error(e.message);
   }
 
   const deployer = new Deployer(signer);
@@ -76,7 +75,7 @@ async function main() {
       address: deploymentRegistry.address,
     }).catch(e => console.error(e.message)),
     run('verify:verify', {
-      address: CREATE2_DEPLOYER_ADDRESS,
+      address: deployerAddress,
     }).catch(e => console.error(e.message)),
   ]);
 }

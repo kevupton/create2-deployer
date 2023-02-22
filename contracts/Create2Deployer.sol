@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.9;
+pragma solidity ^0.8.18;
 
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
@@ -8,6 +8,9 @@ import "@openzeppelin/contracts/proxy/Clones.sol";
 // TODO add a clone method
 contract Create2Deployer {
     using Address for address;
+
+    event Deployed(address indexed target);
+    event Call(address indexed target, bytes data, bytes result);
 
     struct FunctionCall {
         address target;
@@ -39,9 +42,9 @@ contract Create2Deployer {
             }
         }
 
-        for (uint i = 0; i < calls.length; i++) {
-            calls[i].target.functionCall(calls[i].data);
-        }
+        emit Deployed(addr);
+
+        call(calls);
     }
 
     function clone(address target, uint256 salt) public returns (address addr) {
@@ -57,5 +60,13 @@ contract Create2Deployer {
     function createTemplate(bytes calldata bytecode) external returns (bytes32 _templateId) {
         _templateId = templateId(bytecode);
         template[_templateId] = bytecode;
+    }
+
+    function call(FunctionCall[] calldata calls) public returns (bytes[] memory results) {
+        results = new bytes[](calls.length);
+        for (uint i = 0; i < calls.length; i++) {
+            results[i] = calls[i].target.functionCall(calls[i].data);
+            emit Call(calls[i].target, calls[i].data, results[i]);
+        }
     }
 }
