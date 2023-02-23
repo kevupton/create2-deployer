@@ -17,41 +17,42 @@ async function main() {
 
   const factories: ContractFactoryType[] = [
     TransparentUpgradeableProxy__factory,
-    ProxyAdmin__factory,
     BeaconProxy__factory,
     UpgradeableBeacon__factory,
     ERC1967Proxy__factory,
+    ProxyAdmin__factory,
   ];
 
-  let hasDeployment = false;
   const templateIds: Record<string, string> = {};
   const verifyTasks: (() => void)[] = [];
   for (const factory of factories) {
     const instance = new factory();
-    const name = factory.constructor.name.replace('__factory', '');
-    const contract = await deployer.deploy(instance, {salt: 0});
+    const name = factory.name.replace('__factory', '');
+    const templateId = Deployer.templateId(instance);
+    const address = deployer.factoryAddress(instance, {salt: 0});
 
-    if (contract.deployTransaction) {
-      hasDeployment = true;
-    }
+    templateIds[name] = templateId;
 
-    await contract.deployed();
+    console.log(name, address, templateId);
+
+    await deployer.createTemplate(instance);
+    await deployer.deployTemplate(templateId, {salt: 0});
+
+    console.log('deployed');
 
     verifyTasks.push(() => {
+      console.log('verifying', name);
       run('verify:verify', {
-        address: contract.address,
+        address: address,
         // constructorArguments: [],
       }).catch(e => console.error(e.message));
     });
-    templateIds[name] = await deployer.createTemplate(instance);
   }
 
   console.log(templateIds);
 
-  if (hasDeployment) {
-    await new Promise(res => setTimeout(res, 10000));
-    await Promise.all(verifyTasks.map(task => task()));
-  }
+  await new Promise(res => setTimeout(res, 10000));
+  await Promise.all(verifyTasks.map(task => task()));
 }
 
 // We recommend this pattern to be able to use async/await everywhere

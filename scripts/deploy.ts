@@ -14,7 +14,7 @@ async function main() {
     'Create2Deployer'
   );
 
-  let deployerAddress = CREATE2_DEPLOYER_ADDRESS;
+  const deployerAddress = CREATE2_DEPLOYER_ADDRESS;
   try {
     const create2Deployer = await create2DeployerFactory.deploy({
       nonce: 0,
@@ -22,7 +22,6 @@ async function main() {
     await create2Deployer.deployed();
     console.log('deployer', create2Deployer.address);
     console.log(create2Deployer.deployTransaction.hash);
-    deployerAddress = create2Deployer.address;
     return;
   } catch (e: any) {
     // console.error(e.message);

@@ -229,7 +229,7 @@ export class Deployer {
 
   async deployTemplate(
     templateId: PromiseOrValue<BytesLike>,
-    {id, salt, calls = [], overrides}: DeployTemplateOptions = {}
+    {id, salt, calls = [], overrides = {}}: DeployTemplateOptions = {}
   ) {
     await this.validate('deployTemplate', templateId);
     const contractAddress = await this.templateAddress(templateId, {id, salt});
@@ -356,7 +356,6 @@ export class Deployer {
     bytecode: BytesLike,
     {id, salt}: DeployAddressOptions = {}
   ) {
-    salt = hexZeroPad(BigNumber.from(salt).toHexString(), 32);
     const hash = keccak256(
       hexConcat([
         '0xff',
@@ -398,8 +397,8 @@ export class Deployer {
   static generateSalt(id?: string, salt: BigNumberish = BigNumber.from(0)) {
     salt = BigNumber.from(salt).toHexString();
     if (id) {
-      return keccak256(hexConcat([toUtf8Bytes(id), salt]));
+      salt = keccak256(hexConcat([toUtf8Bytes(id), salt]));
     }
-    return salt;
+    return hexZeroPad(salt, 32);
   }
 }
