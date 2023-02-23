@@ -31,10 +31,6 @@ const config: HardhatUserConfig = {
     ],
   },
   networks: {
-    rinkeby: {
-      url: `https://rinkeby.infura.io/v3/${INFURA_API_KEY}`,
-      accounts,
-    },
     mainnet: {
       url: `https://mainnet.infura.io/v3/${INFURA_API_KEY}`,
       accounts,

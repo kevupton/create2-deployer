@@ -14,15 +14,17 @@ import {
   hexDataSlice,
   hexZeroPad,
   keccak256,
+  toUtf8Bytes,
 } from 'ethers/lib/utils';
 import {Artifact} from 'hardhat/types';
 import {SignerWithAddress} from '@nomiclabs/hardhat-ethers/signers';
-import {makeTemplates} from './templates';
 import {Create2Deployer} from '../../typechain-types/contracts/Create2Deployer';
 import {JsonRpcSigner} from '@ethersproject/providers';
 import {Create2Deployer__factory} from '../../typechain-types';
 import {PromiseOrValue} from '../../typechain-types/common';
 import {CREATE2_DEPLOYER_ADDRESS} from './constants';
+import {ContractFactoryFor, ContractFromFactory} from './types';
+import {wait} from '../utils';
 
 export type Head<T extends unknown[]> = T extends [
   ...other: infer Head,
@@ -31,36 +33,43 @@ export type Head<T extends unknown[]> = T extends [
   ? Head
   : Array<unknown>;
 
-export interface DeployOptions<T extends ContractFactory = ContractFactory> {
-  args?: Head<Parameters<T['deploy']>>;
+export interface OptionsBase {
+  id?: string;
   salt?: BigNumberish;
+}
+
+export interface OptionsOverrides {
+  overrides?: Overrides & {from?: string | Promise<string>};
+}
+
+export interface OptionsCalls {
   calls?: (Create2Deployer.FunctionCallStruct | PromiseOrValue<BytesLike>)[];
-  overrides?: Overrides & {from?: string | Promise<string>};
 }
 
-export interface CloneOptions {
-  salt?: BigNumberish;
-  overrides?: Overrides & {from?: string | Promise<string>};
-}
-
-export interface DeployArtifactOptions {
-  salt?: BigNumberish;
-  calls?: Create2Deployer.FunctionCallStruct[];
-  overrides?: Overrides & {from?: string | Promise<string>};
-}
-
-export interface DeployAddressOptions<T extends ContractFactory> {
+export interface OptionsArgs<T extends ContractFactoryFor> {
   args?: Head<Parameters<T['deploy']>>;
-  salt?: BigNumberish;
 }
 
-export interface CreateTemplateOptions<T extends ContractFactory> {
-  args?: Head<Parameters<T['deploy']>>;
-  overrides?: Overrides & {from?: string | Promise<string>};
-}
-
-export type ContractFromFactory<T extends ContractFactory = ContractFactory> =
-  Awaited<ReturnType<T['deploy']>>;
+export type DeployOptions<T extends ContractFactoryFor = ContractFactoryFor> =
+  OptionsBase & OptionsOverrides & OptionsCalls & OptionsArgs<T>;
+export type CloneOptions = OptionsBase & OptionsOverrides;
+export type DeployArtifactOptions = OptionsBase &
+  OptionsCalls &
+  OptionsOverrides;
+export type DeployTemplateOptions = OptionsBase &
+  OptionsCalls &
+  OptionsOverrides;
+export type DeployTemplateFromFactoryOptions<
+  T extends ContractFactoryFor = ContractFactoryFor
+> = OptionsBase & OptionsCalls & OptionsArgs<T> & OptionsOverrides;
+export type FactoryAddressOptions<
+  T extends ContractFactoryFor = ContractFactoryFor
+> = OptionsBase & OptionsArgs<T>;
+export type TemplateAddressOptions = OptionsBase;
+export type DeployAddressOptions = OptionsBase;
+export type CloneAddressOptions = OptionsBase;
+export type CreateTemplateOptions<T extends ContractFactory> = OptionsArgs<T> &
+  OptionsOverrides;
 
 export class Deployer {
   public readonly provider = this.signer.provider!;
@@ -69,8 +78,6 @@ export class Deployer {
     this.signer
   );
   public readonly address = CREATE2_DEPLOYER_ADDRESS;
-
-  public readonly templates = makeTemplates(this);
 
   public constructor(
     public readonly signer: SignerWithAddress,
@@ -97,6 +104,7 @@ export class Deployer {
   async deploy<T extends ContractFactory>(
     factory: T,
     {
+      id,
       args,
       calls = [],
       salt = this.defaultSalt,
@@ -104,7 +112,7 @@ export class Deployer {
     }: DeployOptions<T> = {}
   ): Promise<ContractFromFactory<T>> {
     await this.validate('deploy', factory);
-    const contractAddress = Deployer.factoryAddress(factory, {args, salt});
+    const contractAddress = Deployer.factoryAddress(factory, {id, args, salt});
     const code = await this.provider.getCode(contractAddress);
     const contract = factory
       .connect(this.signer)
@@ -116,7 +124,7 @@ export class Deployer {
       const bytecode = Deployer.bytecode(factory, args);
       const tx = await this.create2Deployer.deploy(
         bytecode,
-        salt,
+        this.generateSalt(id, salt),
         await Deployer.formatCalls(calls, contractAddress),
         overrides
       );
@@ -131,14 +139,14 @@ export class Deployer {
 
   async clone(
     target: string,
-    {salt = this.defaultSalt, overrides = {}}: CloneOptions = {}
+    {id, salt, overrides = {}}: CloneOptions = {}
   ): Promise<{
     address: string;
     deployed: Promise<string>;
     deployTransaction?: ContractTransaction;
   }> {
     await this.validate('clone', target);
-    const contractAddress = this.cloneAddress(target, salt);
+    const contractAddress = this.cloneAddress(target, {id, salt});
     const code = await this.provider.getCode(contractAddress);
 
     if (hexDataLength(code)) {
@@ -147,10 +155,14 @@ export class Deployer {
         address: contractAddress,
       };
     } else {
-      const tx = await this.create2Deployer.clone(target, salt, overrides);
+      const tx = await this.create2Deployer.clone(
+        target,
+        this.generateSalt(id, salt),
+        overrides
+      );
       return {
         address: contractAddress,
-        deployed: tx.wait().then(() => contractAddress),
+        deployed: wait(tx).then(() => contractAddress),
         deployTransaction: tx,
       };
     }
@@ -159,11 +171,16 @@ export class Deployer {
   async deployArtifact(
     artifact: Artifact,
     args: BytesLike = '0x',
-    {salt = this.defaultSalt, calls = [], overrides = {}}: DeployArtifactOptions
+    {
+      id,
+      salt = this.defaultSalt,
+      calls = [],
+      overrides = {},
+    }: DeployArtifactOptions
   ): Promise<Contract> {
     await this.validate('deployArtifact', artifact);
     const bytecode = hexConcat([artifact.bytecode, args]);
-    const contractAddress = Deployer.deployAddress(bytecode, salt);
+    const contractAddress = Deployer.deployAddress(bytecode, {id, salt});
     const code = await this.provider.getCode(contractAddress);
     const contract = new Contract(contractAddress, artifact.abi, this.signer);
 
@@ -172,11 +189,11 @@ export class Deployer {
     } else {
       const tx = await this.create2Deployer.deploy(
         bytecode,
-        salt,
-        calls,
+        this.generateSalt(id, salt),
+        await Deployer.formatCalls(calls, contractAddress),
         overrides
       );
-      contract._deployedPromise = tx.wait().then(() => contract);
+      contract._deployedPromise = wait(tx).then(() => contract);
       Object.defineProperty(contract, 'deployTransaction', {
         writable: false,
         value: tx,
@@ -188,16 +205,89 @@ export class Deployer {
 
   factoryAddress<T extends ContractFactory>(
     factory: T,
-    {args, salt = this.defaultSalt}: DeployAddressOptions<T> = {}
+    {id, args, salt = this.defaultSalt}: FactoryAddressOptions<T> = {}
   ): string {
-    return Deployer.factoryAddress(factory, {args, salt});
+    return Deployer.factoryAddress(factory, {id, args, salt});
   }
 
-  cloneAddress<T extends ContractFactory>(
+  cloneAddress(
     target: BytesLike,
-    salt = this.defaultSalt
+    {id, salt}: CloneAddressOptions = {}
   ): string {
-    return Deployer.cloneAddress(target, salt);
+    return Deployer.cloneAddress(target, this.generateSalt(id, salt));
+  }
+
+  async templateAddress(
+    templateId: PromiseOrValue<BytesLike>,
+    {id, salt}: TemplateAddressOptions = {}
+  ) {
+    await this.validate('templateAddress', templateId);
+    return await this.create2Deployer.templateAddress(
+      templateId,
+      this.generateSalt(id, salt)
+    );
+  }
+
+  async deployTemplate(
+    templateId: PromiseOrValue<BytesLike>,
+    {id, salt, calls = [], overrides}: DeployTemplateOptions = {}
+  ) {
+    await this.validate('deployTemplate', templateId);
+    const contractAddress = await this.templateAddress(templateId, {id, salt});
+    const code = await this.provider.getCode(contractAddress);
+
+    if (hexDataLength(code)) {
+      return;
+    }
+
+    await this.create2Deployer
+      .deployTemplate(
+        templateId,
+        this.generateSalt(id, salt),
+        await Deployer.formatCalls(calls, contractAddress),
+        overrides
+      )
+      .then(wait);
+  }
+
+  async deployTemplateFromFactory<T extends ContractFactory>(
+    factory: T,
+    {
+      id,
+      salt,
+      calls = [],
+      args,
+      overrides,
+    }: DeployTemplateFromFactoryOptions<T> = {}
+  ) {
+    await this.validate('deployTemplateFromFactory', factory);
+    const templateId = Deployer.templateId(factory, args);
+    const contractAddress = this.factoryAddress(factory, {
+      id,
+      salt,
+      args,
+    });
+    const code = await this.provider.getCode(contractAddress);
+    const contract = factory
+      .connect(this.signer)
+      .attach(contractAddress) as ContractFromFactory<T>;
+
+    if (hexDataLength(code)) {
+      contract._deployedPromise = Promise.resolve(contract);
+    } else {
+      const tx = await this.create2Deployer.deployTemplate(
+        templateId,
+        this.generateSalt(id, salt),
+        await Deployer.formatCalls(calls, contractAddress),
+        overrides
+      );
+      Object.defineProperty(contract, 'deployTransaction', {
+        writable: false,
+        value: tx,
+      });
+    }
+
+    return contract;
   }
 
   async createTemplate<T extends ContractFactory>(
@@ -211,13 +301,13 @@ export class Deployer {
     if (!hexDataLength(template)) {
       await this.create2Deployer
         .createTemplate(Deployer.bytecode(factory, args), overrides)
-        .then(tx => tx.wait());
+        .then(wait);
     }
 
     return templateId;
   }
 
-  static templateId<T extends ContractFactory>(
+  static templateId<T extends ContractFactory = ContractFactory>(
     factory: T,
     args?: Head<Parameters<T['deploy']>>
   ) {
@@ -258,15 +348,23 @@ export class Deployer {
 
   static factoryAddress<T extends ContractFactory>(
     factory: T,
-    {args, salt}: DeployAddressOptions<T> = {}
+    {id, args, salt}: FactoryAddressOptions<T> = {}
   ): string {
-    return this.deployAddress(this.bytecode(factory, args), salt || 0);
+    return this.deployAddress(this.bytecode(factory, args), {id, salt});
   }
 
-  static deployAddress(bytecode: BytesLike, salt: BigNumberish) {
+  static deployAddress(
+    bytecode: BytesLike,
+    {id, salt}: DeployAddressOptions = {}
+  ) {
     salt = hexZeroPad(BigNumber.from(salt).toHexString(), 32);
     const hash = keccak256(
-      hexConcat(['0xff', CREATE2_DEPLOYER_ADDRESS, salt, keccak256(bytecode)])
+      hexConcat([
+        '0xff',
+        CREATE2_DEPLOYER_ADDRESS,
+        this.generateSalt(id, salt),
+        keccak256(bytecode),
+      ])
     );
     return hexDataSlice(hash, 12, 32);
   }
@@ -292,5 +390,17 @@ export class Deployer {
         }
       })
     );
+  }
+
+  generateSalt(id?: string, salt = this.defaultSalt) {
+    return Deployer.generateSalt(id, salt);
+  }
+
+  static generateSalt(id?: string, salt: BigNumberish = BigNumber.from(0)) {
+    salt = BigNumber.from(salt).toHexString();
+    if (id) {
+      return keccak256(hexConcat([toUtf8Bytes(id), salt]));
+    }
+    return salt;
   }
 }

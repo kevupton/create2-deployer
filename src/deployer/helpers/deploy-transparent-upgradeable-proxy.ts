@@ -1,0 +1,73 @@
+import {Contract} from 'ethers';
+import {deployTemplate} from '../templates';
+import {debug} from '../../utils';
+import Safe from '@safe-global/safe-core-sdk';
+import {Deployer, DeployTemplateOptions} from '../deployer';
+import {getProxyAdmin, GetProxyAdminOptions} from './get-proxy-admin';
+import {upgradeTransparentUpgradeableProxy} from './upgrade-transparent-upgradeable-proxy';
+import {
+  getImplementation,
+  GetImplementationOptions,
+} from './get-implementation';
+import {encodeFunctionCall, FunctionCallOptions} from './encode-function-call';
+
+export type TransparentUpgradeableProxyHelperOptions<T extends Contract> =
+  DeployTemplateOptions & {
+    implementation: GetImplementationOptions<T>;
+    proxyAdmin?: GetProxyAdminOptions;
+    upgradeCall?: FunctionCallOptions<T>;
+    initializer?: FunctionCallOptions<T>;
+    multisig?: Safe;
+  };
+
+export const deployTransparentUpgradeableProxy = async <T extends Contract>(
+  deployer: Deployer,
+  {
+    proxyAdmin,
+    implementation,
+    initializer,
+    upgradeCall,
+    multisig,
+    id,
+    salt,
+    overrides,
+  }: TransparentUpgradeableProxyHelperOptions<T>
+) => {
+  proxyAdmin = await getProxyAdmin(deployer, proxyAdmin);
+  implementation = await getImplementation(deployer, implementation);
+
+  // deploy the proxy, or retrieve the proxy instance if it is already deployed.
+  debug('deploying proxy');
+  const proxy = await deployTemplate(deployer, 'TransparentUpgradeableProxy', {
+    logic: implementation.address,
+    admin: proxyAdmin.address,
+    data: encodeFunctionCall(implementation.interface, initializer),
+    id,
+    salt,
+    overrides,
+  });
+  await proxy.deployed();
+
+  // upgrade the proxy if we need to
+  await upgradeTransparentUpgradeableProxy(
+    deployer,
+    proxy,
+    implementation,
+    proxyAdmin,
+    encodeFunctionCall(implementation.interface, upgradeCall),
+    multisig
+  );
+
+  const result = implementation.attach(proxy.address) as T;
+
+  Object.defineProperty(result, 'deployTransaction', {
+    writable: false,
+    value: proxy.deployTransaction,
+  });
+
+  if (!proxy.deployTransaction) {
+    result._deployedPromise = Promise.resolve(result);
+  }
+
+  return result;
+};

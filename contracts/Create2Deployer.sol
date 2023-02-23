@@ -26,6 +26,12 @@ contract Create2Deployer {
         return address(uint160(uint256(hash)));
     }
 
+    function templateAddress(bytes32 _templateId, uint256 salt) public view returns (address addr) {
+        bytes memory _template = template[_templateId];
+        require(_template.length > 0, 'INVALID_TEMPLATE');
+        return deployAddress(_template, salt);
+    }
+
     function cloneAddress(address target, uint256 salt) public view returns (address addr) {
         return Clones.predictDeterministicAddress(target, bytes32(salt));
     }
