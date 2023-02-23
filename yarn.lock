@@ -1297,10 +1297,10 @@
     "@ethersproject/properties" "^5.7.0"
     "@ethersproject/strings" "^5.7.0"
 
-"@gnosis.pm/safe-deployments@1.17.0":
-  version "1.17.0"
-  resolved "https://registry.yarnpkg.com/@gnosis.pm/safe-deployments/-/safe-deployments-1.17.0.tgz#52a7b0e75c08b4a829f491b594e2babbdd6606c5"
-  integrity sha512-vfl13IuSMqJZxTPraRcKZqJcaSCDWTt/JXH6VURa8LHMYATOqd96IGbqqOKRPAgSzAyXpA2thOD4YUQ0X8XKyQ==
+"@gnosis.pm/safe-deployments@1.19.0":
+  version "1.19.0"
+  resolved "https://registry.yarnpkg.com/@gnosis.pm/safe-deployments/-/safe-deployments-1.19.0.tgz#f4ba8cf92cd6fdff4241ac50e410b4a6ff89babe"
+  integrity sha512-EvHR/LjMwJm0QKXyTscRXqR9vnJwCUDiMnRNKRyXe1akW+udiYXjJTAiGuleFS4DOUSqs6DpAjYlLnXMzUsVMw==
   dependencies:
     semver "^7.3.7"
 
@@ -1679,54 +1679,65 @@
     proper-lockfile "^4.1.1"
     solidity-ast "^0.4.15"
 
-"@safe-global/safe-core-sdk-types@^1.7.0":
-  version "1.7.0"
-  resolved "https://registry.yarnpkg.com/@safe-global/safe-core-sdk-types/-/safe-core-sdk-types-1.7.0.tgz#64689bcd72ffacdfb2cb3889f57d6030d45a28bf"
-  integrity sha512-lLPsX7JK2RBkC9hsB3aTy7nP8WcytaEQzZvq34l5mgJqjSEHBl1kMEKJQ/MyLm/yVLrJvY9EYYJCq+ykAGgWcg==
+"@safe-global/safe-core-sdk-types@^1.9.0":
+  version "1.9.0"
+  resolved "https://registry.yarnpkg.com/@safe-global/safe-core-sdk-types/-/safe-core-sdk-types-1.9.0.tgz#dba18f34ab905da6c1c03a3262aeb47cc0bead14"
+  integrity sha512-3VFhnggdLT9kWhnb35eqxEC9cVpW5Sl4E51TZo0RmH1cSzMwlNDbeGINb38PpUbw/wwXFJbCVFmeXELz2ZlCfw==
   dependencies:
     "@ethersproject/bignumber" "^5.7.0"
     "@ethersproject/contracts" "^5.7.0"
-    "@gnosis.pm/safe-deployments" "1.17.0"
+    "@gnosis.pm/safe-deployments" "1.19.0"
     web3-core "^1.8.1"
     web3-utils "^1.8.1"
 
-"@safe-global/safe-core-sdk-utils@^1.5.0":
-  version "1.5.0"
-  resolved "https://registry.yarnpkg.com/@safe-global/safe-core-sdk-utils/-/safe-core-sdk-utils-1.5.0.tgz#78a7fde170dcb8e98802b27c7ad16d3b74170c4a"
-  integrity sha512-3tEdXaVTSXlz9Ppo9H/qz/PBxSQYZoV7a1w9csq9yYElgHXDNhCK+0qWiZRLEEUYE41W3x5rAvxzbuKYkyIijg==
+"@safe-global/safe-core-sdk-utils@^1.7.1":
+  version "1.7.1"
+  resolved "https://registry.yarnpkg.com/@safe-global/safe-core-sdk-utils/-/safe-core-sdk-utils-1.7.1.tgz#45a9d5ea00a0aa3c74a71114f30f71d279a0872a"
+  integrity sha512-lztn4GeqKMWN3n/NB2LXdqv9FQdUbFOrmkpJoOhMu/jdPgQhvptpVc4pjKEMvVfbHe3aNkbLj/dV7LbTenbkWQ==
   dependencies:
-    "@safe-global/safe-core-sdk-types" "^1.7.0"
+    "@safe-global/safe-core-sdk-types" "^1.9.0"
     semver "^7.3.8"
     web3-utils "^1.8.1"
 
-"@safe-global/safe-core-sdk@^3.2.0":
-  version "3.2.0"
-  resolved "https://registry.yarnpkg.com/@safe-global/safe-core-sdk/-/safe-core-sdk-3.2.0.tgz#631b5ea068205d359a53685e7a95c7798861043b"
-  integrity sha512-shcyJZGfq0e8KOFiT3SsPCjwu/xfBOHqUEo3W/eZE1+fPBj+yhQS97cbAKlDg4pBJ9e/tYX1ndYxf5Ne3MgoCw==
+"@safe-global/safe-core-sdk@^3.3.0", "@safe-global/safe-core-sdk@^3.3.1":
+  version "3.3.1"
+  resolved "https://registry.yarnpkg.com/@safe-global/safe-core-sdk/-/safe-core-sdk-3.3.1.tgz#3cfcb143cab9ac6d42388046aefdcfea7434503b"
+  integrity sha512-smuVdFQIAifC79K2maCY4w1pCYWvXIbrPftKQSC+hxhWmDjJYsRfhbBT2lSg2lYbiXeosFGEPMVbiVjtnjQg5w==
   dependencies:
     "@ethersproject/solidity" "^5.7.0"
-    "@gnosis.pm/safe-deployments" "1.17.0"
-    "@safe-global/safe-core-sdk-types" "^1.7.0"
+    "@gnosis.pm/safe-deployments" "1.19.0"
+    "@safe-global/safe-core-sdk-types" "^1.9.0"
+    "@safe-global/safe-core-sdk-utils" "^1.7.1"
     ethereumjs-util "^7.1.5"
     semver "^7.3.8"
     web3-utils "^1.8.1"
 
-"@safe-global/safe-ethers-lib@^1.7.0":
-  version "1.7.0"
-  resolved "https://registry.yarnpkg.com/@safe-global/safe-ethers-lib/-/safe-ethers-lib-1.7.0.tgz#a53253cf33b3bd5d477722ba70a15064bebee18f"
-  integrity sha512-s4OD5C15JvCxuXpye700e+i4diOfdfyObZmnciNmkwNW5NfLdHDwWl5O6EdqSAP2iJd4mhwwAh3FmtYpujfE3A==
+"@safe-global/safe-ethers-adapters@^0.1.0-alpha.16":
+  version "0.1.0-alpha.16"
+  resolved "https://registry.yarnpkg.com/@safe-global/safe-ethers-adapters/-/safe-ethers-adapters-0.1.0-alpha.16.tgz#f577d0f9ed3d82767d803369e81af955b181d7d5"
+  integrity sha512-tuOU2v0PB73I2wa/PDxdeLCBDueWZIR3k2buI/sdG2AtC2XS/tmBgJaHxdfG7pj4nMOTx538cr3Yp5ZM2DZYUw==
   dependencies:
-    "@safe-global/safe-core-sdk-types" "^1.7.0"
-    "@safe-global/safe-core-sdk-utils" "^1.5.0"
-    ethers "^5.7.2"
+    "@gnosis.pm/safe-deployments" "1.19.0"
+    "@safe-global/safe-core-sdk" "^3.3.0"
+    "@safe-global/safe-core-sdk-types" "^1.9.0"
+    axios "^0.27.2"
 
-"@safe-global/safe-service-client@^1.4.0":
-  version "1.4.0"
-  resolved "https://registry.yarnpkg.com/@safe-global/safe-service-client/-/safe-service-client-1.4.0.tgz#766cef9c5051a0a96babb738b039878b3a86a897"
-  integrity sha512-Zej+IdAfM1x4WUxdu5QnFVVCKKTA6eR+FsgovdrLl5WBsrLrXL2yKqsASSSJ6JGrvpv+mCzMXJJIPwkCsDdmIQ==
+"@safe-global/safe-ethers-lib@^1.9.1":
+  version "1.9.1"
+  resolved "https://registry.yarnpkg.com/@safe-global/safe-ethers-lib/-/safe-ethers-lib-1.9.1.tgz#ada9f3d4b93c740d2fc25970aca010d6d478fc1a"
+  integrity sha512-ylJHuSYtjHjO/QXSWgkSWv80zl1EHMKr1AOIUA3ztUJB5etjA6ddPfX1CcqnipUmbrnDN3VqMHNCcDKMr55Wgg==
+  dependencies:
+    "@safe-global/safe-core-sdk-types" "^1.9.0"
+    "@safe-global/safe-core-sdk-utils" "^1.7.1"
+    ethers "5.7.2"
+
+"@safe-global/safe-service-client@^1.5.1":
+  version "1.5.1"
+  resolved "https://registry.yarnpkg.com/@safe-global/safe-service-client/-/safe-service-client-1.5.1.tgz#a8bfd59f4ab4a2ab37afec93fc82b6ada1652ed5"
+  integrity sha512-/17pnv8EoiUq/cQuDKpPz1FFs0CDNJq6AKOmXoiO8CR/WnKbTR9tGfIrt1mnKFUs051tffa5kmXEx3W3IAyp3g==
   dependencies:
     "@ethersproject/abstract-signer" "^5.7.0"
-    "@safe-global/safe-core-sdk-types" "^1.7.0"
+    "@safe-global/safe-core-sdk-types" "^1.9.0"
     node-fetch "^2.6.6"
 
 "@scure/base@~1.1.0":
@@ -2481,6 +2492,14 @@ aws4@^1.8.0:
   resolved "https://registry.yarnpkg.com/aws4/-/aws4-1.11.0.tgz#d61f46d83b2519250e2784daf5b09479a8b41c59"
   integrity sha512-xh1Rl34h6Fi1DC2WWKfxUTVqRsNnr6LsKz2+hfwDxQJWmrx8+c7ylaqBMcHfl1U1r2dsifOvKX3LQuLNZ+XSvA==
 
+axios@^0.27.2:
+  version "0.27.2"
+  resolved "https://registry.yarnpkg.com/axios/-/axios-0.27.2.tgz#207658cc8621606e586c85db4b41a750e756d972"
+  integrity sha512-t+yRIyySRTp/wua5xEr+z1q60QmLq8ABsS5O9Me1AsE5dfKqgnCFzwiCZZ/cGNd1lq4/7akDWMxdhVlucjmnOQ==
+  dependencies:
+    follow-redirects "^1.14.9"
+    form-data "^4.0.0"
+
 babel-plugin-polyfill-corejs2@^0.3.3:
   version "0.3.3"
   resolved "https://registry.yarnpkg.com/babel-plugin-polyfill-corejs2/-/babel-plugin-polyfill-corejs2-0.3.3.tgz#5d1bd3836d0a19e1b84bbf2d9640ccb6f951c122"
@@ -3069,7 +3088,7 @@ colors@1.4.0, colors@^1.1.2:
   resolved "https://registry.yarnpkg.com/colors/-/colors-1.4.0.tgz#c50491479d4c1bdaed2c9ced32cf7c7dc2360f78"
   integrity sha512-a+UqTh4kgZg/SlGvfbzDHpgRu7AAQOmmqRHJnxhRZICKFUT91brVhNNt58CMWU9PsBbv3PDCZUHbVxuDiH2mtA==
 
-combined-stream@^1.0.6, combined-stream@~1.0.6:
+combined-stream@^1.0.6, combined-stream@^1.0.8, combined-stream@~1.0.6:
   version "1.0.8"
   resolved "https://registry.yarnpkg.com/combined-stream/-/combined-stream-1.0.8.tgz#c3d45a8b34fd730631a110a8a2520682b31d5a7f"
   integrity sha512-FQN4MRfuJeHf7cBbBMJFXhKSDq+2kAArBlmRBvcvFE5BB1HZKXtSFASDhdlz9zOYwxh8lDdnvmMOe/+5cdoEdg==
@@ -4083,22 +4102,7 @@ ethereumjs-util@^7.0.10, ethereumjs-util@^7.0.3, ethereumjs-util@^7.1.0, ethereu
     ethereum-cryptography "^0.1.3"
     rlp "^2.2.4"
 
-ethers@^4.0.32, ethers@^4.0.40:
-  version "4.0.49"
-  resolved "https://registry.yarnpkg.com/ethers/-/ethers-4.0.49.tgz#0eb0e9161a0c8b4761be547396bbe2fb121a8894"
-  integrity sha512-kPltTvWiyu+OktYy1IStSO16i2e7cS9D9OxZ81q2UUaiNPVrm/RTcbxamCXF9VUSKzJIdJV68EAIhTEVBalRWg==
-  dependencies:
-    aes-js "3.0.0"
-    bn.js "^4.11.9"
-    elliptic "6.5.4"
-    hash.js "1.1.3"
-    js-sha3 "0.5.7"
-    scrypt-js "2.0.4"
-    setimmediate "1.0.4"
-    uuid "2.0.1"
-    xmlhttprequest "1.8.0"
-
-ethers@^5.7.2:
+ethers@5.7.2, ethers@^5.7.2:
   version "5.7.2"
   resolved "https://registry.yarnpkg.com/ethers/-/ethers-5.7.2.tgz#3a7deeabbb8c030d4126b24f84e525466145872e"
   integrity sha512-wswUsmWo1aOK8rR7DIKiWSw9DbLWe6x98Jrn8wcTflTVvaXhAMaB5zGAXy0GYQEQp9iO1iSHWVyARQm11zUtyg==
@@ -4133,6 +4137,21 @@ ethers@^5.7.2:
     "@ethersproject/wallet" "5.7.0"
     "@ethersproject/web" "5.7.1"
     "@ethersproject/wordlists" "5.7.0"
+
+ethers@^4.0.32, ethers@^4.0.40:
+  version "4.0.49"
+  resolved "https://registry.yarnpkg.com/ethers/-/ethers-4.0.49.tgz#0eb0e9161a0c8b4761be547396bbe2fb121a8894"
+  integrity sha512-kPltTvWiyu+OktYy1IStSO16i2e7cS9D9OxZ81q2UUaiNPVrm/RTcbxamCXF9VUSKzJIdJV68EAIhTEVBalRWg==
+  dependencies:
+    aes-js "3.0.0"
+    bn.js "^4.11.9"
+    elliptic "6.5.4"
+    hash.js "1.1.3"
+    js-sha3 "0.5.7"
+    scrypt-js "2.0.4"
+    setimmediate "1.0.4"
+    uuid "2.0.1"
+    xmlhttprequest "1.8.0"
 
 ethjs-unit@0.1.6:
   version "0.1.6"
@@ -4385,7 +4404,7 @@ flatted@^3.1.0:
   resolved "https://registry.yarnpkg.com/flatted/-/flatted-3.2.7.tgz#609f39207cb614b89d0765b477cb2d437fbf9787"
   integrity sha512-5nqDSxl8nn5BSNxyR3n4I6eDmbolI6WT+QqR547RwxQapgjQBmtktdP+HTBb/a/zLsbzERTONyUB5pefh5TtjQ==
 
-follow-redirects@^1.12.1:
+follow-redirects@^1.12.1, follow-redirects@^1.14.9:
   version "1.15.2"
   resolved "https://registry.yarnpkg.com/follow-redirects/-/follow-redirects-1.15.2.tgz#b460864144ba63f2681096f274c4e57026da2c13"
   integrity sha512-VQLG33o04KaQ8uYi2tVNbdrWp1QWxNNea+nmIB4EVM28v0hmP17z7aG1+wAkNzVq4KeXTq3221ye5qTJP91JwA==
@@ -4409,6 +4428,15 @@ form-data@^2.2.0:
   dependencies:
     asynckit "^0.4.0"
     combined-stream "^1.0.6"
+    mime-types "^2.1.12"
+
+form-data@^4.0.0:
+  version "4.0.0"
+  resolved "https://registry.yarnpkg.com/form-data/-/form-data-4.0.0.tgz#93919daeaf361ee529584b9b31664dc12c9fa452"
+  integrity sha512-ETEklSGi5t0QMZuiXoA/Q6vcnxcLQP5vdugSpuAyi6SVGi2clPPp+xgEhuMaHC+zGgn31Kd235W35f7Hykkaww==
+  dependencies:
+    asynckit "^0.4.0"
+    combined-stream "^1.0.8"
     mime-types "^2.1.12"
 
 form-data@~2.3.2:

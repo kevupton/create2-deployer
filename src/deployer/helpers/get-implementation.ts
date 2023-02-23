@@ -1,7 +1,7 @@
 import {Contract, ContractFactory} from 'ethers';
 import {Deployer, DeployOptions} from '../deployer';
 import {PromiseOrValue} from '../../../typechain-types/common';
-import {ContractFactoryFor} from '../types';
+import {InstanceFactory} from '../types';
 
 export interface ImplementationDeployment<
   T extends ContractFactory = ContractFactory
@@ -10,9 +10,8 @@ export interface ImplementationDeployment<
   options: DeployOptions<T>;
 }
 
-export type GetImplementationOptions<T extends Contract> = PromiseOrValue<
-  T | ImplementationDeployment<ContractFactoryFor<T>>
->;
+export type GetImplementationOptions<T extends Contract = Contract> =
+  PromiseOrValue<T | ImplementationDeployment<InstanceFactory<T>>>;
 
 export async function getImplementation<T extends Contract>(
   deployer: Deployer,

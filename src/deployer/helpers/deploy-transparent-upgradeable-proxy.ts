@@ -1,5 +1,4 @@
-import {Contract} from 'ethers';
-import {deployTemplate} from '../templates';
+import {Contract, Signer} from 'ethers';
 import {debug} from '../../utils';
 import Safe from '@safe-global/safe-core-sdk';
 import {Deployer, DeployTemplateOptions} from '../deployer';
@@ -10,6 +9,7 @@ import {
   GetImplementationOptions,
 } from './get-implementation';
 import {encodeFunctionCall, FunctionCallOptions} from './encode-function-call';
+import {deployTemplate} from './deploy-template';
 
 export type TransparentUpgradeableProxyHelperOptions<T extends Contract> =
   DeployTemplateOptions & {
@@ -17,7 +17,7 @@ export type TransparentUpgradeableProxyHelperOptions<T extends Contract> =
     proxyAdmin?: GetProxyAdminOptions;
     upgradeCall?: FunctionCallOptions<T>;
     initializer?: FunctionCallOptions<T>;
-    multisig?: Safe;
+    signer?: Signer;
   };
 
 export const deployTransparentUpgradeableProxy = async <T extends Contract>(
@@ -27,7 +27,7 @@ export const deployTransparentUpgradeableProxy = async <T extends Contract>(
     implementation,
     initializer,
     upgradeCall,
-    multisig,
+    signer,
     id,
     salt,
     overrides,
@@ -55,7 +55,7 @@ export const deployTransparentUpgradeableProxy = async <T extends Contract>(
     implementation,
     proxyAdmin,
     encodeFunctionCall(implementation.interface, upgradeCall),
-    multisig
+    signer
   );
 
   const result = implementation.attach(proxy.address) as T;

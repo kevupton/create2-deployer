@@ -1,18 +1,32 @@
 import {Deployer} from '../deployer';
-import {BigNumber, Contract} from 'ethers';
+import {BigNumber, Contract, Signer} from 'ethers';
 import {ProxyAdmin} from '../../../typechain-types/contracts/proxy';
 import Safe from '@safe-global/safe-core-sdk';
-import {debug} from '../../utils';
+import {debug, wait} from '../../utils';
 import SafeServiceClient from '@safe-global/safe-service-client';
+import {getSafeSigner} from '../multisig/get-safe-signer';
+import {TransactionResponse} from '@ethersproject/providers';
+import {getProxyAdmin, GetProxyAdminOptions} from './get-proxy-admin';
+import {
+  getImplementation,
+  GetImplementationOptions,
+} from './get-implementation';
+import {encodeFunctionCall, FunctionCallOptions} from './encode-function-call';
+import {SafeEthersSigner} from '@safe-global/safe-ethers-adapters';
 
-export async function upgradeTransparentUpgradeableProxy(
+export async function upgradeTransparentUpgradeableProxy<
+  T extends Contract = Contract
+>(
   deployer: Deployer,
   proxy: Contract,
-  implementation: Contract,
-  proxyAdmin: ProxyAdmin,
-  data = '0x',
-  multisig?: Safe
+  implementation: GetImplementationOptions<T>,
+  proxyAdmin: GetProxyAdminOptions,
+  call?: FunctionCallOptions<T>,
+  signer?: Signer
 ) {
+  proxyAdmin = await getProxyAdmin(deployer, proxyAdmin);
+  implementation = await getImplementation(deployer, implementation);
+
   const currentImpl = BigNumber.from(
     await proxyAdmin.getProxyImplementation(proxy.address)
   );
@@ -23,64 +37,24 @@ export async function upgradeTransparentUpgradeableProxy(
 
   debug('upgrading proxy implementation to ' + implementation.address);
 
-  debug('is multisig?', !!multisig);
-  if (multisig) {
-    const txData =
-      data !== '0x'
-        ? proxyAdmin.interface.encodeFunctionData('upgradeAndCall', [
-            proxy.address,
-            implementation.address,
-            data,
-          ])
-        : proxyAdmin.interface.encodeFunctionData('upgrade', [
-            proxy.address,
-            implementation.address,
-          ]);
+  if (signer) {
+    proxyAdmin = proxyAdmin.connect(signer);
+  }
 
-    if (multisig instanceof Safe) {
-      debug('submitting upgrade to multisig wallet');
-      const safeTransaction = await multisig.createTransaction({
-        safeTransactionData: {
-          data: txData,
-          to: proxyAdmin.address,
-          value: '0',
-        },
-      });
-      const safeTransactionHash = await multisig.getTransactionHash(
-        safeTransaction
-      );
-      const senderSignature = await multisig.signTransactionHash(
-        safeTransactionHash
-      );
-      const safeService = new SafeServiceClient({
-        txServiceUrl: 'https://safe-transaction.goerli.gnosis.io/',
-        ethAdapter: multisig.getEthAdapter(),
-      });
-
-      debug('proposed tx details', {
-        safeAddress: multisig.getAddress(),
-        safeTransactionData: safeTransaction.data,
-        safeTxHash: safeTransactionHash,
-        senderAddress: senderSignature.signer,
-      });
-      await safeService.proposeTransaction({
-        safeAddress: multisig.getAddress(),
-        safeTransactionData: safeTransaction.data,
-        safeTxHash: safeTransactionHash,
-        senderAddress: senderSignature.signer,
-        senderSignature: senderSignature.data,
-      });
-    } else {
-      throw new Error('Unknown multisig');
-    }
+  let tx: TransactionResponse;
+  if (call) {
+    tx = await proxyAdmin.upgradeAndCall(
+      proxy.address,
+      implementation.address,
+      encodeFunctionCall(implementation.interface, call)
+    );
   } else {
-    const tx = data
-      ? await proxyAdmin.upgradeAndCall(
-          proxy.address,
-          implementation.address,
-          data
-        )
-      : await proxyAdmin.upgrade(proxy.address, implementation.address);
-    await tx.wait();
+    tx = await proxyAdmin.upgrade(proxy.address, implementation.address);
+  }
+
+  if (signer instanceof SafeEthersSigner) {
+    console.log('sent safe tx of to be signed: ' + tx.hash);
+  } else {
+    await wait(tx);
   }
 }

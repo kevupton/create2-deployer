@@ -1,9 +1,9 @@
 import {Contract, ContractFactory} from 'ethers';
 
-export type ContractFromFactory<T extends ContractFactory = ContractFactory> =
+export type FactoryInstance<T extends ContractFactory = ContractFactory> =
   Awaited<ReturnType<T['deploy']>>;
 
-export type ContractFactoryFor<T extends Contract = Contract> = Omit<
+export type InstanceFactory<T extends Contract = Contract> = Omit<
   ContractFactory,
   'deploy'
 > & {

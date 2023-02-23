@@ -1,12 +1,9 @@
-import {BigNumberish, ContractFactory} from 'ethers';
-import {
-  ContractFromFactory,
-  Deployer,
-  DeployOptions,
-  ProxyOptions,
-} from '../deployer';
+import {ContractFactory} from 'ethers';
+import {Deployer, DeployOptions, DeployTemplateOptions} from '../deployer';
 import {DeploymentInfo, Registry} from './registry';
 import {HardhatRuntimeEnvironment} from 'hardhat/types';
+import {FactoryInstance} from '../deployer/types';
+import {PromiseOrValue} from '../../typechain-types/common';
 
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface EnvironmentSettings {}
@@ -27,7 +24,7 @@ export interface CallbackContext<T extends ContractFactory = ContractFactory> {
   settings: EnvironmentSettings;
   config: ContractConfigurationWithId<T>;
 
-  deploy(): Promise<ContractFromFactory<T>>;
+  deploy(): Promise<FactoryInstance<T>>;
 
   configure(): Promise<void>;
 }
@@ -39,7 +36,6 @@ export interface BaseConfiguration<
   name: string;
   roles?: Record<string, symbol>;
   requiredRoles?: (symbol | ((account: string) => Promise<void>))[];
-  dependencies?: string[];
 
   deployed?(
     this: Omit<CallbackContext<T>, 'contracts'> & {
@@ -81,24 +77,17 @@ export interface ProxyConfiguration<T extends ContractFactory = ContractFactory>
   extends BaseConfiguration<T> {
   deployOptions?:
     | DeployOptions<T>
-    | ((
-        options: DeploymentInfo
-      ) => DeployOptions<T> | PromiseLike<DeployOptions<T>>);
+    | ((options: DeploymentInfo) => PromiseOrValue<DeployOptions<T>>);
   proxy:
-    | {
-        id?: string;
+    | ({
         type: 'TransparentUpgradeableProxy';
         owner?: string;
-        options?: ProxyOptions<ContractFromFactory<T>>;
-      }
-    | {
-        id?: string;
+        proxyAdmin?: string;
+      } & DeployTemplateOptions)
+    | ({
         type: 'UpgradeableBeacon';
         owner?: string;
-        options?: {
-          salt: BigNumberish;
-        };
-      };
+      } & DeployTemplateOptions);
 }
 
 export type ContractConfiguration<T extends ContractFactory = ContractFactory> =

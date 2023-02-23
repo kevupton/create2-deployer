@@ -23,7 +23,7 @@ import {JsonRpcSigner} from '@ethersproject/providers';
 import {Create2Deployer__factory} from '../../typechain-types';
 import {PromiseOrValue} from '../../typechain-types/common';
 import {CREATE2_DEPLOYER_ADDRESS} from './constants';
-import {ContractFactoryFor, ContractFromFactory} from './types';
+import {InstanceFactory, FactoryInstance} from './types';
 import {wait} from '../utils';
 
 export type Head<T extends unknown[]> = T extends [
@@ -46,11 +46,11 @@ export interface OptionsCalls {
   calls?: (Create2Deployer.FunctionCallStruct | PromiseOrValue<BytesLike>)[];
 }
 
-export interface OptionsArgs<T extends ContractFactoryFor> {
+export interface OptionsArgs<T extends InstanceFactory> {
   args?: Head<Parameters<T['deploy']>>;
 }
 
-export type DeployOptions<T extends ContractFactoryFor = ContractFactoryFor> =
+export type DeployOptions<T extends InstanceFactory = InstanceFactory> =
   OptionsBase & OptionsOverrides & OptionsCalls & OptionsArgs<T>;
 export type CloneOptions = OptionsBase & OptionsOverrides;
 export type DeployArtifactOptions = OptionsBase &
@@ -60,11 +60,10 @@ export type DeployTemplateOptions = OptionsBase &
   OptionsCalls &
   OptionsOverrides;
 export type DeployTemplateFromFactoryOptions<
-  T extends ContractFactoryFor = ContractFactoryFor
+  T extends InstanceFactory = InstanceFactory
 > = OptionsBase & OptionsCalls & OptionsArgs<T> & OptionsOverrides;
-export type FactoryAddressOptions<
-  T extends ContractFactoryFor = ContractFactoryFor
-> = OptionsBase & OptionsArgs<T>;
+export type FactoryAddressOptions<T extends InstanceFactory = InstanceFactory> =
+  OptionsBase & OptionsArgs<T>;
 export type TemplateAddressOptions = OptionsBase;
 export type DeployAddressOptions = OptionsBase;
 export type CloneAddressOptions = OptionsBase;
@@ -110,13 +109,13 @@ export class Deployer {
       salt = this.defaultSalt,
       overrides = {},
     }: DeployOptions<T> = {}
-  ): Promise<ContractFromFactory<T>> {
+  ): Promise<FactoryInstance<T>> {
     await this.validate('deploy', factory);
     const contractAddress = Deployer.factoryAddress(factory, {id, args, salt});
     const code = await this.provider.getCode(contractAddress);
     const contract = factory
       .connect(this.signer)
-      .attach(contractAddress) as ContractFromFactory<T>;
+      .attach(contractAddress) as FactoryInstance<T>;
 
     if (hexDataLength(code)) {
       contract._deployedPromise = Promise.resolve(contract);
@@ -270,7 +269,7 @@ export class Deployer {
     const code = await this.provider.getCode(contractAddress);
     const contract = factory
       .connect(this.signer)
-      .attach(contractAddress) as ContractFromFactory<T>;
+      .attach(contractAddress) as FactoryInstance<T>;
 
     if (hexDataLength(code)) {
       contract._deployedPromise = Promise.resolve(contract);

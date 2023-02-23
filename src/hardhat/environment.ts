@@ -4,17 +4,17 @@ import {
   Contract,
   ContractFactory,
   ethers,
+  Signer,
 } from 'ethers';
 import {
   CallbackContext,
   ConfigOrConstructor,
-  EnvironmentSettings,
   ContractConfigurationWithId,
   ContractSuite,
   DependencyConfig,
   DetailedDependencies,
+  EnvironmentSettings,
   ProxyConfiguration,
-  DeployOptionsWithId,
 } from './types';
 import {camel} from 'case';
 import {Registry} from './registry';
@@ -23,7 +23,13 @@ import {RoleManager} from './role-manager';
 import {HardhatRuntimeEnvironment} from 'hardhat/types';
 import {glob} from 'glob';
 import path from 'path';
-import {ContractFromFactory, Deployer, DeployOptions} from '../deployer';
+import {
+  Deployer,
+  DeployOptions,
+  deployTemplate,
+  deployTransparentUpgradeableProxy,
+  getTemplateAddress,
+} from '../deployer';
 import {
   hexConcat,
   hexDataLength,
@@ -35,9 +41,10 @@ import EthersAdapter from '@safe-global/safe-ethers-lib';
 import {
   ProxyAdmin__factory,
   UpgradeableBeacon__factory,
-} from '../../typechain-types';
+} from '../../typechain-types/factories/contracts/proxy';
 import {getAdminAddress} from '@openzeppelin/upgrades-core';
-import {address} from 'hardhat/internal/core/config/config-validation';
+import {FactoryInstance} from '../deployer/types';
+import {getSafeSigner} from '../deployer/multisig/get-safe-signer';
 
 export class Environment {
   public readonly deployer = (process.env.DEPLOYER
@@ -176,18 +183,7 @@ export class Environment {
     const deployer = await this.deployer;
 
     if ('proxy' in config) {
-      switch (config.proxy.type) {
-        case 'TransparentUpgradeableProxy':
-          return deployer.templates.transparentUpgradeableProxyAddress(
-            config.proxy.id || config.id,
-            config.proxy.options?.salt
-          );
-        case 'UpgradeableBeacon':
-          return deployer.templates.upgradeableBeaconAddress(
-            config.proxy.id || config.id,
-            config.proxy.options?.salt
-          );
-      }
+      return this._getProxyAddress(deployer, config);
     }
 
     return deployer.factoryAddress(factory, {
@@ -388,7 +384,7 @@ export class Environment {
     );
 
     for (const config of configs) {
-      console.log('deploying', config.name);
+      console.log('deploying', config.id);
 
       try {
         await this._deployContract(config, deployer, registry, constructorId);
@@ -423,7 +419,7 @@ export class Environment {
       passing[config.id] = true;
 
       if (!contract) {
-        console.error('missing contract for', config.name);
+        console.error('missing contract for', config.id);
         passing[config.id] = false;
         continue;
       }
@@ -433,14 +429,14 @@ export class Environment {
 
       if (!deploymentInfo[config.id].initialized && config.initialize) {
         try {
-          console.log('initializing', config.name);
+          console.log('initializing', config.id);
           await config.initialize.call(await this._createContext(config));
 
           registry.setInitialized(contract.address, constructorId);
 
           if (config.initialized) {
             try {
-              console.log('event initialized', config.name);
+              console.log('event initialized', config.id);
               await config.initialized.call(await this._createContext(config));
             } catch (e: any) {
               console.error(
@@ -486,7 +482,7 @@ export class Environment {
     for (const config of configs) {
       if (config.finalize) {
         try {
-          console.log('finalizing', config.name);
+          console.log('finalizing', config.id);
           await config.finalize.call(await this._createContext(config));
         } catch (e: any) {
           console.error('finalizing failed for', config.name, ' - ', e.message);
@@ -498,14 +494,14 @@ export class Environment {
       const contract = this._contracts[config.id];
 
       if (!contract) {
-        console.error('missing contract for', config.name);
+        console.error('missing contract for', config.id);
         continue;
       }
 
       if (!passing[config.id]) continue;
 
       if ('proxy' in config && config.proxy.owner) {
-        console.log('transferring ownership', config.name);
+        console.log('transferring ownership', config.id);
         await this._transferOwnership(
           deployer,
           contract.address,
@@ -515,7 +511,7 @@ export class Environment {
 
       if (config.finalized) {
         try {
-          console.log('event finalized', config.name);
+          console.log('event finalized', config.id);
           await config.finalized.call(await this._createContext(config));
         } catch (e: any) {
           console.error(
@@ -534,11 +530,11 @@ export class Environment {
     deployer: Deployer,
     registry: Registry,
     constructorId: string
-  ): Promise<ContractFromFactory<T>> {
-    const factory: T = await this._factory(config.name);
-    let contract: ContractFromFactory<T>;
+  ): Promise<FactoryInstance<T>> {
+    const factory: T = await this._factory(config.id);
+    let contract: FactoryInstance<T>;
     let address: string;
-    let options: DeployOptionsWithId<T> | undefined;
+    let options: DeployOptions<T> | undefined;
 
     if ('proxy' in config) {
       if (typeof config.deployOptions === 'function') {
@@ -572,7 +568,7 @@ export class Environment {
       debug('deployment is a proxy');
       if (config.proxy.type === 'TransparentUpgradeableProxy') {
         let proxyAdmin = await this._getProxyAdmin(address);
-        let safe: Safe | undefined;
+        let signer: Signer | undefined;
 
         try {
           if (proxyAdmin) {
@@ -581,13 +577,7 @@ export class Environment {
 
             // if there is a bytecode lets assume it is a proxy admin
             if (hexDataLength(code) > 0) {
-              safe = await Safe.create({
-                ethAdapter: new EthersAdapter({
-                  ethers,
-                  signerOrProvider: proxyAdmin.signer,
-                }),
-                safeAddress: owner,
-              });
+              signer = await getSafeSigner(owner, proxyAdmin.signer);
             } else if (
               !BigNumber.from(owner).eq(await proxyAdmin.signer.getAddress())
             ) {
@@ -605,20 +595,25 @@ export class Environment {
           );
         }
 
-        contract = await deployer.templates.transparentUpgradeableProxy(
-          config.proxy.id || config.id,
-          contract,
-          {
-            ...(config.proxy.options || {}),
-            multisig: safe,
-            proxyAdmin: proxyAdmin || config.proxy.options?.proxyAdmin,
-          }
-        );
+        contract = await deployTransparentUpgradeableProxy(deployer, {
+          id: config.proxy.id || config.id,
+          salt: config.proxy.salt,
+          overrides: config.proxy.overrides,
+          implementation: contract,
+          signer,
+          proxyAdmin: proxyAdmin ?? {
+            id: config.proxy.proxyAdmin,
+            salt: config.proxy.salt,
+            owner: config.proxy.owner,
+          },
+        });
       } else if (config.proxy.type === 'UpgradeableBeacon') {
-        contract = (await deployer.templates.upgradeableBeacon(
-          config.proxy.id || config.id,
-          config.proxy.options?.salt
-        )) as any; // TODO to fix this because it is expecting to return the contract but should get upgradeable beacon
+        contract = (await deployTemplate(deployer, 'UpgradeableBeacon', {
+          implementation: contract.address,
+          owner: config.proxy.owner || deployer.signer.address,
+          id: config.proxy.id || config.id,
+          salt: config.proxy.salt,
+        })) as any; // TODO to fix this because it is expecting to return the contract but should get upgradeable beacon
       } else {
         throw new Error('invalid proxy type "' + config.proxy['type'] + '"');
       }
@@ -649,15 +644,15 @@ export class Environment {
     config: ProxyConfiguration<T> & {id: string}
   ) {
     if (config.proxy.type === 'TransparentUpgradeableProxy') {
-      return deployer.templates.transparentUpgradeableProxyAddress(
-        config.proxy.id || config.id,
-        config.proxy.options?.salt
-      );
+      return getTemplateAddress(deployer, 'TransparentUpgradeableProxy', {
+        id: config.proxy.id || config.id,
+        salt: config.proxy.salt,
+      });
     } else if (config.proxy.type === 'UpgradeableBeacon') {
-      return deployer.templates.upgradeableBeaconAddress(
-        config.proxy.id || config.id,
-        config.proxy.options?.salt
-      );
+      return getTemplateAddress(deployer, 'UpgradeableBeacon', {
+        id: config.proxy.id || config.id,
+        salt: config.proxy.salt,
+      });
     } else {
       throw new Error('invalid proxy type "' + config.proxy['type'] + '"');
     }
@@ -770,12 +765,12 @@ export class Environment {
         );
         await this._configureContract(config, configureId, {}, registry);
       },
-      deploy: async (): Promise<ContractFromFactory<T>> => {
+      deploy: async (): Promise<FactoryInstance<T>> => {
         const constructorId = await registry.registerSettings(
           this.hre.config.environment.settings
         );
 
-        console.log('deploying', config.name);
+        console.log('deploying', config.id);
         return await this._deployContract(
           config,
           deployer,
@@ -795,17 +790,17 @@ export class Environment {
     const contract = this._contracts[config.id];
 
     if (!contract) {
-      console.error('missing contract for', config.name);
+      console.error('missing contract for', config.id);
     }
 
     if (passing[config.id] && config.configure && contract) {
       try {
-        console.log('configuring', config.name);
+        console.log('configuring', config.id);
         await config.configure.call(await this._createContext(config));
         registry.setConfigured(contract.address, configureId);
         if (config.configured) {
           try {
-            console.log('event configured', config.name);
+            console.log('event configured', config.id);
             await config.configured.call(await this._createContext(config));
           } catch (e: any) {
             console.error(
@@ -843,19 +838,19 @@ export class Environment {
         let result: EnvironmentSettings | undefined;
         switch (stage) {
           case 'initialize':
-            console.log('preparing ' + stage + ' for ' + config.name);
+            console.log('preparing ' + stage + ' for ' + config.id);
             result = await config.prepareInitialize?.call(
               await this._createContext(config)
             );
             break;
           case 'configure':
-            console.log('preparing ' + stage + ' for ' + config.name);
+            console.log('preparing ' + stage + ' for ' + config.id);
             result = await config.prepareConfigure?.call(
               await this._createContext(config)
             );
             break;
           case 'finalize':
-            console.log('preparing ' + stage + ' for ' + config.name);
+            console.log('preparing ' + stage + ' for ' + config.id);
             result = await config.prepareFinalize?.call(
               await this._createContext(config)
             );

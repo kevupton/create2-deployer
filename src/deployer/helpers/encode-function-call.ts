@@ -10,7 +10,7 @@ export interface FunctionCall<T extends Contract> {
   args: ReadonlyArray<unknown>;
 }
 
-export type FunctionCallOptions<T extends Contract> =
+export type FunctionCallOptions<T extends Contract = Contract> =
   | FunctionCall<T>
   | FunctionName<T>;
 

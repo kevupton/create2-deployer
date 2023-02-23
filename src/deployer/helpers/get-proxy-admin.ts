@@ -1,10 +1,11 @@
 import {Deployer} from '../deployer';
-import {deployTemplate, TemplateOptions} from '../templates';
 import {PromiseOrValue} from '../../../typechain-types/common';
 import {ProxyAdmin} from '../../../typechain-types/contracts/proxy';
+import {deployTemplate} from './deploy-template';
+import {TemplateCreateOptions} from '../templates';
 
 export type GetProxyAdminOptions = PromiseOrValue<
-  ProxyAdmin | string | Partial<TemplateOptions<'ProxyAdmin'>>
+  ProxyAdmin | string | Partial<TemplateCreateOptions<'ProxyAdmin'>>
 >;
 
 export const getProxyAdmin = async (
