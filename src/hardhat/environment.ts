@@ -469,7 +469,7 @@ export class Environment {
     );
 
     for (const config of configs) {
-      await this._configureContract(config, configureId, passing, registry);
+      await this._configureContract(config, configureId, registry, passing);
     }
   }
 
@@ -763,7 +763,7 @@ export class Environment {
         const configureId = await registry.registerSettings(
           this.hre.config.environment.settings
         );
-        await this._configureContract(config, configureId, {}, registry);
+        await this._configureContract(config, configureId, registry);
       },
       deploy: async (): Promise<FactoryInstance<T>> => {
         const constructorId = await registry.registerSettings(
@@ -784,8 +784,8 @@ export class Environment {
   private async _configureContract<T extends ContractFactory = ContractFactory>(
     config: ContractConfigurationWithId<T>,
     configureId: string,
-    passing: Record<string, boolean>,
-    registry: Registry
+    registry: Registry,
+    passing?: Record<string, boolean>
   ) {
     const contract = this._contracts[config.id];
 
@@ -793,7 +793,7 @@ export class Environment {
       console.error('missing contract for', config.id);
     }
 
-    if (passing[config.id] && config.configure && contract) {
+    if ((!passing || passing[config.id]) && config.configure && contract) {
       try {
         console.log('configuring', config.id);
         await config.configure.call(await this._createContext(config));
@@ -813,7 +813,9 @@ export class Environment {
         }
       } catch (e: any) {
         console.error('configure failed for', config.name, ' - ', e.message);
-        passing[config.id] = false;
+        if (passing) {
+          passing[config.id] = false;
+        }
       }
     }
   }
