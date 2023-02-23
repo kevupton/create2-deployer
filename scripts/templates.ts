@@ -29,7 +29,7 @@ async function main() {
   for (const factory of factories) {
     const instance = new factory();
     const name = factory.constructor.name.replace('__factory', '');
-    const contract = await deployer.deploy(instance);
+    const contract = await deployer.deploy(instance, {salt: 0});
 
     if (contract.deployTransaction) {
       hasDeployment = true;

@@ -44,7 +44,7 @@ import {
 } from '../../typechain-types/factories/contracts/proxy';
 import {getAdminAddress} from '@openzeppelin/upgrades-core';
 import {FactoryInstance} from '../deployer/types';
-import {getSafeSigner} from '../deployer/multisig/get-safe-signer';
+import {getSafeSigner} from '../deployer/helpers/get-safe-signer';
 
 export class Environment {
   public readonly deployer = (process.env.DEPLOYER
@@ -353,17 +353,13 @@ export class Environment {
     debug('loading config...');
 
     for (const {config} of await this._loadDependencies(key)) {
-      try {
-        configs.push(
-          await this._parseConfig(
-            config,
-            this.hre.config.environment.settings,
-            addressSuite
-          )
-        );
-      } catch (e: any) {
-        debug('failed to parse config: ', e.message);
-      }
+      configs.push(
+        await this._parseConfig(
+          config,
+          this.hre.config.environment.settings,
+          addressSuite
+        )
+      );
     }
 
     debug('loaded configuration', addressSuite);
