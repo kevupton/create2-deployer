@@ -23,6 +23,7 @@ async function main() {
     console.log('deployer', create2Deployer.address);
     console.log(create2Deployer.deployTransaction.hash);
     deployerAddress = create2Deployer.address;
+    return;
   } catch (e: any) {
     // console.error(e.message);
   }
