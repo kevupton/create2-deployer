@@ -16,12 +16,13 @@ export async function deployTemplate<K extends TemplateID>(
 ): Promise<FactoryInstance<TemplateInstance<K>>> {
   debug('deploying template ' + id);
   const target = getTemplateAddress(deployer, id, options);
-  const {Factory, createOptions} = Template[id];
+  const {Factory, createOptions, args} = Template[id];
   const factory = new Factory();
   const contract = await deployer.deploy(
     factory,
     createOptions({
       ...(options as any),
+      args,
       target,
     })
   );

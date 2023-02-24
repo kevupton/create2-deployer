@@ -346,7 +346,7 @@ export class Environment {
       const contract = this._contracts[config.id];
       if (!contract) {
         console.error('missing contract for', config.name);
-        this._errors.push({
+        this._registerError({
           id: config.id,
           error: new Error('missing contract'),
           details: 'grant roles failed',
@@ -368,7 +368,7 @@ export class Environment {
         } catch (e: any) {
           // TODO add context to the rolesMapping
           console.log('failed grant role for', config.id);
-          this._errors.push({
+          this._registerError({
             id: config.id,
             error: e,
             details: 'grant roles failed',
@@ -417,7 +417,7 @@ export class Environment {
         await this._deployContract(config, deployer, registry, constructorId);
       } catch (e: any) {
         console.error('failed to deploy', config.id);
-        this._errors.push({
+        this._registerError({
           id: config.id,
           error: e,
           details: 'deployment failed',
@@ -445,7 +445,7 @@ export class Environment {
 
       if (!contract) {
         console.error('missing contract for', config.id);
-        this._errors.push({
+        this._registerError({
           id: config.id,
           error: new Error('missing contract'),
           details: 'initialize failed',
@@ -469,7 +469,7 @@ export class Environment {
               await config.initialized.call(await this._createContext(config));
             } catch (e: any) {
               console.error('event "initialized" failed for', config.id);
-              this._errors.push({
+              this._registerError({
                 id: config.id,
                 error: e,
                 details: 'initialized event failed',
@@ -478,7 +478,7 @@ export class Environment {
           }
         } catch (e: any) {
           console.error('failed initializing', config.id);
-          this._errors.push({
+          this._registerError({
             id: config.id,
             error: e,
             details: 'initialize failed',
@@ -546,7 +546,7 @@ export class Environment {
           await config.finalized.call(await this._createContext(config));
         } catch (e: any) {
           console.error('event finalized failed for ', config.id);
-          this._errors.push({
+          this._registerError({
             id: config.id,
             error: e,
             details: 'finalized event failed',
@@ -867,7 +867,7 @@ export class Environment {
           await config.configured.call(await this._createContext(config));
         } catch (e: any) {
           console.error('event "configured" failed for', config.name);
-          this._errors.push({
+          this._registerError({
             id: config.id,
             details: 'configure event failed',
             error: e,
@@ -876,7 +876,7 @@ export class Environment {
       }
     } catch (e: any) {
       console.error('configure failed for', config.name);
-      this._errors.push({
+      this._registerError({
         id: config.id,
         details: 'configure failed',
         error: e,
@@ -926,7 +926,7 @@ export class Environment {
         if (result) this._updateSettings(result);
       } catch (e: any) {
         console.error('error preparing ' + stage, config.name, e.message);
-        this._errors.push({
+        this._registerError({
           id: config.id,
           details: 'prepare settings for ' + stage,
           error: e,
@@ -963,5 +963,14 @@ export class Environment {
     if (errors.length > 0) {
       throw new Error('[UPGRADE FAILED]\n' + errors.join('\n'));
     }
+  }
+
+  private _registerError(error: ErrorDetails) {
+    if (process.env.FAIL_ON_ERROR) {
+      console.error(error);
+      throw error.error;
+    }
+
+    this._errors.push(error);
   }
 }

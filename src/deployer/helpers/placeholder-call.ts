@@ -9,6 +9,6 @@ export function placeholderCall(
 ): Create2Deployer.FunctionCallStruct {
   return {
     target: PLACEHOLDER_ADDRESS,
-    data: defaultAbiCoder.encode(['address', 'data'], [target, data]),
+    data: defaultAbiCoder.encode(['address', 'bytes'], [target, data]),
   };
 }
