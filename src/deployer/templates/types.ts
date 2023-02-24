@@ -1,9 +1,5 @@
 import {ContractFactory} from 'ethers';
-import {
-  Deployer,
-  DeployTemplateFromFactoryOptions,
-  OptionsArgs,
-} from '../deployer';
+import {Deployer, DeployOptions, OptionsArgs} from '../deployer';
 import {Template} from './index';
 
 export interface TemplateConfig<
@@ -11,10 +7,9 @@ export interface TemplateConfig<
   TDeployData = {}
 > extends OptionsArgs<T> {
   factory: {new (): T};
+  demoData: TDeployData;
 
-  createOptions(
-    options: DeployTemplateFromFactoryOptions<T> & TDeployData
-  ): DeployTemplateFromFactoryOptions<T>;
+  createOptions(options: DeployOptions<T> & TDeployData): DeployOptions<T>;
 }
 
 export type TemplateConfigGenerator<T extends ContractFactory> = (

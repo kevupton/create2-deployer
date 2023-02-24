@@ -1,7 +1,8 @@
-import {TransparentUpgradeableProxy__factory} from '../../../typechain-types/factories/contracts/proxy';
+import {TransparentUpgradeableProxy__factory} from '../../proxy';
 import {TemplateConfig} from './types';
 import {BytesLike} from 'ethers';
 import {PromiseOrValue} from '../../../typechain-types/common';
+import {PLACEHOLDER_ADDRESS} from '../constants';
 
 export interface TransparentUpgradeableProxyDeployOptions {
   logic: PromiseOrValue<string>;
@@ -14,24 +15,15 @@ export const transparentUpgradeableProxyTemplate: TemplateConfig<
   TransparentUpgradeableProxyDeployOptions
 > = {
   factory: TransparentUpgradeableProxy__factory,
-  createOptions({logic, admin, data, calls = [], ...options}) {
+  demoData: {
+    logic: PLACEHOLDER_ADDRESS,
+    admin: PLACEHOLDER_ADDRESS,
+  },
+  createOptions({logic, admin, data = '0x', calls = [], ...options}) {
     return {
       ...options,
-      calls: [
-        initializeTransparentUpgradeableProxy(logic, admin, data),
-        ...calls,
-      ],
+      args: [logic, admin, data],
+      calls: [...calls],
     };
   },
 };
-
-function initializeTransparentUpgradeableProxy(
-  logic: PromiseOrValue<string>,
-  admin: PromiseOrValue<string>,
-  data: PromiseOrValue<BytesLike> = '0x'
-) {
-  return TransparentUpgradeableProxy__factory.createInterface().encodeFunctionData(
-    'initialize',
-    [logic, admin, data]
-  );
-}

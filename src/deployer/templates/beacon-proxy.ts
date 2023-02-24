@@ -1,6 +1,7 @@
-import {BeaconProxy__factory} from '../../../typechain-types/factories/contracts/proxy';
+import {BeaconProxy__factory} from '../../proxy';
 import {TemplateConfig} from './types';
 import {BytesLike} from 'ethers';
+import {PLACEHOLDER_ADDRESS} from '../constants';
 import {PromiseOrValue} from '../../../typechain-types/common';
 
 export interface BeaconProxyDeployOptions {
@@ -13,20 +14,14 @@ export const beaconProxyTemplate: TemplateConfig<
   BeaconProxyDeployOptions
 > = {
   factory: BeaconProxy__factory,
-  createOptions({beacon, data, calls = [], ...options}) {
+  demoData: {
+    beacon: PLACEHOLDER_ADDRESS,
+  },
+  createOptions({beacon, data = '0x', calls = [], ...options}) {
     return {
       ...options,
-      calls: [initializeBeaconProxy(beacon, data), ...calls],
+      args: [beacon, data],
+      calls: [...calls],
     };
   },
 };
-
-function initializeBeaconProxy(
-  beacon: PromiseOrValue<string>,
-  data: PromiseOrValue<BytesLike> = '0x'
-) {
-  return BeaconProxy__factory.createInterface().encodeFunctionData(
-    'initialize',
-    [beacon, data]
-  );
-}

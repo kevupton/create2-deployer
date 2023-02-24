@@ -61,10 +61,6 @@ async function main() {
   await deploymentRegistry.deployed();
 
   console.log('verifying...');
-  if (deploymentRegistry.deployTransaction || placeholder.deployTransaction) {
-    await new Promise(res => setTimeout(res, 10000));
-  }
-
   await Promise.all([
     verify({name: 'Placeholder', address: placeholder.address}),
     verify({name: 'DeploymentRegistry', address: deploymentRegistry.address}),

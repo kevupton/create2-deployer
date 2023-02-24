@@ -1,7 +1,8 @@
-import {ERC1967Proxy__factory} from '../../../typechain-types/factories/contracts/proxy';
+import {ERC1967Proxy__factory} from '../../proxy';
 import {TemplateConfig} from './types';
 import {BytesLike} from 'ethers';
 import {PromiseOrValue} from '../../../typechain-types/common';
+import {PLACEHOLDER_ADDRESS} from '../constants';
 
 export interface ERC1967ProxyDeployOptions {
   logic: PromiseOrValue<string>;
@@ -13,20 +14,14 @@ export const erc1967Template: TemplateConfig<
   ERC1967ProxyDeployOptions
 > = {
   factory: ERC1967Proxy__factory,
-  createOptions({logic, data, calls = [], ...options}) {
+  demoData: {
+    logic: PLACEHOLDER_ADDRESS,
+  },
+  createOptions({logic, data = '0x', calls = [], ...options}) {
     return {
       ...options,
-      calls: [initializeERC1967Proxy(logic, data), ...calls],
+      args: [logic, data],
+      calls: [...calls],
     };
   },
 };
-
-function initializeERC1967Proxy(
-  logic: PromiseOrValue<string>,
-  data: PromiseOrValue<BytesLike> = '0x'
-) {
-  return ERC1967Proxy__factory.createInterface().encodeFunctionData(
-    'initialize',
-    [logic, data]
-  );
-}

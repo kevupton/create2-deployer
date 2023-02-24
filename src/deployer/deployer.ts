@@ -245,7 +245,7 @@ export class Deployer {
         getOverrides(overrides, this.provider)
       )
       .then(tx => {
-        debug('hash: ' + tx.hash);
+        debug('template deployed ' + tx.hash);
         return tx;
       })
       .then(wait);

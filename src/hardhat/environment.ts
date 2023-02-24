@@ -38,10 +38,7 @@ import {
 } from 'ethers/lib/utils';
 import Safe from '@safe-global/safe-core-sdk';
 import EthersAdapter from '@safe-global/safe-ethers-lib';
-import {
-  ProxyAdmin__factory,
-  UpgradeableBeacon__factory,
-} from '../../typechain-types/factories/contracts/proxy';
+import {ProxyAdmin__factory, UpgradeableBeacon__factory} from '../proxy';
 import {getAdminAddress} from '@openzeppelin/upgrades-core';
 import {FactoryInstance} from '../deployer/types';
 import {getSafeSigner} from '../deployer/helpers/get-safe-signer';
@@ -662,7 +659,6 @@ export class Environment {
           proxyAdmin: proxyAdmin ?? {
             id: config.proxy.proxyAdmin,
             salt: config.proxy.salt,
-            owner: config.proxy.owner,
           },
         });
       } else if (config.proxy.type === 'UpgradeableBeacon') {

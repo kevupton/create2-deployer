@@ -28,3 +28,20 @@ Add to `hardhat.config.ts`
 ```ts
 import 'create2-deployer/testing';
 ```
+
+
+Example `.env`
+```dotenv
+# used in the network url
+INFURA_API_KEY=
+
+# the api key to verify smart contracts using
+ETHERSCAN_API_KEY=
+
+# all of the private keys used (mainly just deployer for now)
+PRIVATE_KEY=
+
+CONFIRMATIONS=6
+GAS_PRICE_MULTIPLIER=1.5
+CREATE2_DEBUG=true
+```

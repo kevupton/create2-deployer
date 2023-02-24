@@ -13,8 +13,6 @@ import {
 } from '../../typechain-types';
 import {CREATE2_DEPLOYER_ADDRESS, Deployer} from '../deployer';
 import {debug} from '../utils';
-import {deployTemplates} from '../deployer/templates/deploy-templates';
-import {BeaconProxy__factory} from '../../typechain-types/factories/contracts/proxy';
 
 let contracts: Record<string, string> = {};
 
@@ -129,11 +127,6 @@ task(TASK_TEST_SETUP_TEST_ENVIRONMENT).setAction(
 
     const deployer = new Deployer(signer);
 
-    console.log('beacon proxy');
-    const factory = new BeaconProxy__factory(signer);
-    await factory.deploy();
-    console.log('deployed');
-
     const deploymentRegistry = await deployer.deploy(
       new DeploymentRegistry__factory(),
       {salt: 0}
@@ -144,8 +137,6 @@ task(TASK_TEST_SETUP_TEST_ENVIRONMENT).setAction(
       salt: 0,
     });
     await placeholder.deployed();
-
-    await deployTemplates(deployer);
 
     console.log('Create2 Deployer Setup');
   }

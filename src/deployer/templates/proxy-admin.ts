@@ -1,5 +1,6 @@
-import {ProxyAdmin__factory} from '../../../typechain-types/factories/contracts/proxy';
+import {ProxyAdmin__factory} from '../../proxy';
 import {TemplateConfig} from './types';
+import {PLACEHOLDER_ADDRESS} from '../constants';
 
 export interface ProxyAdminDeployOptions {
   owner: string;
@@ -10,17 +11,20 @@ export const proxyAdminTemplate: TemplateConfig<
   ProxyAdminDeployOptions
 > = {
   factory: ProxyAdmin__factory,
+  demoData: {
+    owner: PLACEHOLDER_ADDRESS,
+  },
   createOptions({owner, calls = [], ...options}) {
     return {
       ...options,
-      calls: [initializeProxyAdmin(owner), ...calls],
+      calls: [transferOwnership(owner), ...calls],
     };
   },
 };
 
-function initializeProxyAdmin(owner: string) {
+function transferOwnership(owner: string) {
   return ProxyAdmin__factory.createInterface().encodeFunctionData(
-    'initialize',
+    'transferOwnership',
     [owner]
   );
 }

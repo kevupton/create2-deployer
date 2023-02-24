@@ -16,7 +16,7 @@ export async function deployTemplate<K extends TemplateID>(
   debug('deploying template ' + id);
   const config = Template[id];
   const factory = new config.factory();
-  const contract = await deployer.deployTemplateFromFactory(
+  const contract = await deployer.deploy(
     factory,
     config.createOptions(options as any)
   );

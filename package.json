@@ -52,6 +52,7 @@
     "@safe-global/safe-ethers-lib": "^1.9.1",
     "@safe-global/safe-service-client": "^1.5.1",
     "glob": "^8.0.3",
+    "hardhat-dependency-compiler": "^1.1.3",
     "hardhat-package": "^1.0.0-beta.11"
   },
   "engines": {
