@@ -24,7 +24,7 @@ import {Create2Deployer__factory} from '../../typechain-types';
 import {PromiseOrValue} from '../../typechain-types/common';
 import {CREATE2_DEPLOYER_ADDRESS} from './constants';
 import {InstanceFactory, FactoryInstance} from './types';
-import {wait} from '../utils';
+import {debug, wait} from '../utils';
 
 export type Head<T extends unknown[]> = T extends [
   ...other: infer Head,
@@ -256,7 +256,7 @@ export class Deployer {
       salt,
       calls = [],
       args,
-      overrides,
+      overrides = {},
     }: DeployTemplateFromFactoryOptions<T> = {}
   ) {
     await this.validate('deployTemplateFromFactory', factory);
@@ -266,6 +266,7 @@ export class Deployer {
       salt,
       args,
     });
+    debug('templateId ' + templateId);
     const code = await this.provider.getCode(contractAddress);
     const contract = factory
       .connect(this.signer)

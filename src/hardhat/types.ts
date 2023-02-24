@@ -1,5 +1,10 @@
 import {ContractFactory} from 'ethers';
-import {Deployer, DeployOptions, DeployTemplateOptions} from '../deployer';
+import {
+  Deployer,
+  DeployOptions,
+  DeployTemplateOptions,
+  FunctionCallOptions,
+} from '../deployer';
 import {DeploymentInfo, Registry} from './registry';
 import {HardhatRuntimeEnvironment} from 'hardhat/types';
 import {FactoryInstance} from '../deployer/types';
@@ -83,10 +88,14 @@ export interface ProxyConfiguration<T extends ContractFactory = ContractFactory>
         type: 'TransparentUpgradeableProxy';
         owner?: string;
         proxyAdmin?: string;
+        initialize?: FunctionCallOptions<FactoryInstance<T>>;
+        upgrade?: FunctionCallOptions<FactoryInstance<T>>;
       } & DeployTemplateOptions)
     | ({
         type: 'UpgradeableBeacon';
         owner?: string;
+        initialize?: FunctionCallOptions<FactoryInstance<T>>;
+        upgrade?: FunctionCallOptions<FactoryInstance<T>>;
       } & DeployTemplateOptions);
 }
 
@@ -116,10 +125,22 @@ export interface DetailedDependencies {
   deploy?: DependencyConfig[];
   initialize?: DependencyConfig[];
   configure?: DependencyConfig[];
+  finalize?: DependencyConfig[];
   address?: DependencyConfig[];
 }
+
+export type DetailedDependenciesLoaded = {
+  [key in keyof DetailedDependencies]: DependencyConfigLoaded[];
+};
 
 export interface DependencyConfig<T extends ContractFactory = ContractFactory> {
   config: ConfigOrConstructor<T>;
   deps?: DependencyConfig[] | DetailedDependencies;
+}
+
+export interface DependencyConfigLoaded<
+  T extends ContractFactory = ContractFactory
+> {
+  config: ContractConfigurationWithId<T>;
+  deps?: DependencyConfigLoaded[] | DetailedDependenciesLoaded;
 }

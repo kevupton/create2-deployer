@@ -1,6 +1,7 @@
 import {Contract} from 'ethers';
 import {Interface} from '@ethersproject/abi';
-import {defaultAbiCoder, hexConcat} from 'ethers/lib/utils';
+import {defaultAbiCoder, hexConcat, isHexString} from 'ethers/lib/utils';
+import {debug} from '../../utils';
 
 export type FunctionName<T extends Contract> =
   keyof T['interface']['functions'];
@@ -18,8 +19,14 @@ export function encodeFunctionCall<T extends Contract>(
   int: Interface,
   call?: FunctionCallOptions<T>
 ) {
+  debug('encodeFunctionCall', call);
+
   if (!call) {
     return '0x';
+  }
+
+  if (typeof call === 'string' && isHexString(call)) {
+    return call;
   }
 
   call = typeof call !== 'object' ? {id: call, args: []} : call;

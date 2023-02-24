@@ -1,6 +1,9 @@
 import {Deployer} from '../deployer';
 import {BigNumber, Contract, Signer} from 'ethers';
-import {ProxyAdmin} from '../../../typechain-types/contracts/proxy';
+import {
+  ProxyAdmin,
+  UpgradeableBeacon,
+} from '../../../typechain-types/contracts/proxy';
 import Safe from '@safe-global/safe-core-sdk';
 import {debug, wait} from '../../utils';
 import SafeServiceClient from '@safe-global/safe-service-client';
@@ -14,32 +17,20 @@ import {
 import {encodeFunctionCall, FunctionCallOptions} from './encode-function-call';
 import {SafeEthersSigner} from '@safe-global/safe-ethers-adapters';
 
-export interface UpgradeTransparentUpgradeableProxyOptions<T extends Contract> {
-  proxy: Contract;
+export interface UpgradeUpgradeableBeaconProxyOptions<T extends Contract> {
+  beacon: UpgradeableBeacon;
   implementation: GetImplementationOptions<T>;
-  proxyAdmin: GetProxyAdminOptions;
-  call?: FunctionCallOptions<T>;
   signer?: Signer;
 }
 
-export async function upgradeTransparentUpgradeableProxy<
+export async function upgradeUpgradeableBeaconProxy<
   T extends Contract = Contract
 >(
   deployer: Deployer,
-  {
-    proxy,
-    implementation,
-    proxyAdmin,
-    call,
-    signer,
-  }: UpgradeTransparentUpgradeableProxyOptions<T>
+  {beacon, implementation, signer}: UpgradeUpgradeableBeaconProxyOptions<T>
 ) {
-  proxyAdmin = await getProxyAdmin(deployer, proxyAdmin);
   implementation = await getImplementation(deployer, implementation);
-
-  const currentImpl = BigNumber.from(
-    await proxyAdmin.getProxyImplementation(proxy.address)
-  );
+  const currentImpl = BigNumber.from(await beacon.implementation());
 
   if (currentImpl.eq(implementation.address)) {
     return;
@@ -48,22 +39,13 @@ export async function upgradeTransparentUpgradeableProxy<
   debug('upgrading proxy implementation to ' + implementation.address);
 
   if (signer) {
-    proxyAdmin = proxyAdmin.connect(signer);
+    beacon = beacon.connect(signer);
   }
 
-  let tx: TransactionResponse;
-  if (call) {
-    tx = await proxyAdmin.upgradeAndCall(
-      proxy.address,
-      implementation.address,
-      encodeFunctionCall(implementation.interface, call)
-    );
-  } else {
-    tx = await proxyAdmin.upgrade(proxy.address, implementation.address);
-  }
+  const tx = await beacon.upgradeTo(implementation.address);
 
   if (signer instanceof SafeEthersSigner) {
-    console.log('sent safe tx of to be signed: ' + tx.hash);
+    console.log('sent safe tx to be signed: ' + tx.hash);
   } else {
     await wait(tx);
   }

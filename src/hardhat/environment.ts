@@ -12,6 +12,7 @@ import {
   ContractConfigurationWithId,
   ContractSuite,
   DependencyConfig,
+  DependencyConfigLoaded,
   DetailedDependencies,
   EnvironmentSettings,
   ProxyConfiguration,
@@ -26,7 +27,6 @@ import path from 'path';
 import {
   Deployer,
   DeployOptions,
-  deployTemplate,
   deployTransparentUpgradeableProxy,
   getTemplateAddress,
 } from '../deployer';
@@ -45,6 +45,14 @@ import {
 import {getAdminAddress} from '@openzeppelin/upgrades-core';
 import {FactoryInstance} from '../deployer/types';
 import {getSafeSigner} from '../deployer/helpers/get-safe-signer';
+import {deployUpgradeableBeaconProxy} from '../deployer/helpers/deploy-upgradeable-beacon';
+
+export interface ErrorDetails {
+  error: any;
+  details: string;
+  context?: Record<string, unknown>;
+  stopProgression?: boolean;
+}
 
 export class Environment {
   public readonly deployer = (process.env.DEPLOYER
@@ -55,7 +63,7 @@ export class Environment {
   private _dependencies: Promise<DependencyConfig[]> | undefined;
   private _ready: Promise<{
     addressSuite: Record<string, string>;
-    configs: ContractConfigurationWithId[];
+    dependencies: DependencyConfigLoaded[];
   }>;
   private _factories = new Map<string, ContractFactory>();
   private _parsedConfigs = new Map<
@@ -64,9 +72,10 @@ export class Environment {
   >();
   private _contracts: Record<string, Contract> = {};
   private _settings: EnvironmentSettings;
+  private _errors: Record<string | symbol, ErrorDetails[]> = {};
 
   constructor(public readonly hre: HardhatRuntimeEnvironment) {
-    this._ready = this._loadConfigurations('address');
+    this._ready = this._prepareConfigurations();
     this._settings = this.hre.config.environment.settings;
   }
 
@@ -82,8 +91,8 @@ export class Environment {
     return this._contracts as ContractSuite;
   }
 
-  get configs() {
-    return this._ready.then(val => val.configs);
+  get dependencies() {
+    return this._ready.then(val => val.dependencies);
   }
 
   get registry() {
@@ -93,7 +102,7 @@ export class Environment {
   reload() {
     this._parsedConfigs.clear();
     this._factories.clear();
-    this._ready = this._loadConfigurations('address');
+    this._ready = this._prepareConfigurations();
   }
 
   async getDeploymentInfo<T extends Record<string, string>>(contracts: T) {
@@ -109,23 +118,27 @@ export class Environment {
 
     debug('address suite', addresses);
     this._contracts = {};
+    this._errors = {};
 
-    this._ready = this._loadConfigurations('deploy');
-    await this._deployConfigurations(registry);
-    await this._grantRoles();
+    let configs = await this._sortConfigurations('deploy');
+    await this._deployConfigurations(configs, registry);
+    await this._grantRoles(configs);
 
-    this._ready = this._loadConfigurations('initialize');
-    await this._prepareSettings('initialize');
-    const passing = await this._initialize(registry);
+    configs = await this._sortConfigurations('initialize');
+    await this._prepareSettings(configs, 'initialize');
+    await this._initialize(configs, registry);
 
-    this._ready = this._loadConfigurations('configure');
-    await this._prepareSettings('configure', passing);
-    await this._configure(passing, registry);
+    configs = await this._sortConfigurations('configure');
+    await this._prepareSettings(configs, 'configure');
+    await this._configure(configs, registry);
 
     await registry.sync();
 
-    await this._prepareSettings('finalize', passing);
-    await this._finalize(passing);
+    configs = await this._sortConfigurations('finalize');
+    await this._prepareSettings(configs, 'finalize');
+    await this._finalize(configs);
+
+    this._checkErrors();
 
     return this.contracts as ContractSuite;
   }
@@ -234,69 +247,77 @@ export class Environment {
     return this._dependencies;
   }
 
-  private async _loadDependencies(key?: keyof DetailedDependencies) {
-    const dependencies = await this._fetchDependencies();
-    const sortedConfigs: DependencyConfig[] = [];
+  private async _sortConfigurations(key?: keyof DetailedDependencies) {
+    const {dependencies} = await this._ready;
 
-    const getDeps = (config: DependencyConfig) => {
+    return this._sortDependencies(dependencies, key)
+      .map(({config}) => config)
+      .filter(config => {
+        return this._canProgress(config.id);
+      });
+  }
+
+  private _sortDependencies<
+    T extends DependencyConfig | DependencyConfigLoaded
+  >(dependencies: T[], key?: keyof DetailedDependencies) {
+    const sortedDeps: T[] = [];
+
+    const getDeps = (config: T) => {
       if (Array.isArray(config.deps)) {
-        return config.deps;
+        return config.deps as T[];
       }
 
       if (key !== undefined && config.deps?.[key]) {
-        return config.deps[key]!;
+        return config.deps[key]! as T[];
       }
 
-      return config.deps?.default || [];
+      return (config.deps?.default || []) as T[];
     };
 
-    const configs = new WeakMap<
-      DependencyConfig,
-      {remaining: DependencyConfig[]; dependers: DependencyConfig[]}
-    >();
+    const tempConfigs = new WeakMap<T, {remaining: T[]; dependers: T[]}>();
 
     dependencies.forEach(curConfig => {
       const deps = getDeps(curConfig);
       const config = {
-        dependers: configs.get(curConfig)?.dependers || [],
+        dependers: tempConfigs.get(curConfig)?.dependers || [],
         remaining: deps.concat(),
       };
       if (deps.length > 0) {
         deps.forEach(dep => {
-          configs.set(
+          tempConfigs.set(
             dep,
-            configs.get(dep) || {
+            tempConfigs.get(dep) || {
               dependers: [],
               remaining: [],
             }
           );
-          configs.get(dep)!.dependers.push(curConfig);
+          tempConfigs.get(dep)!.dependers.push(curConfig);
         });
       } else {
-        sortedConfigs.push(curConfig);
+        sortedDeps.push(curConfig);
       }
-      configs.set(curConfig, config);
+      tempConfigs.set(curConfig, config);
     });
 
-    for (let i = 0; i < sortedConfigs.length; i++) {
-      const curDep = sortedConfigs[i];
-      const config = configs.get(curDep)!;
+    for (let i = 0; i < sortedDeps.length; i++) {
+      const curDep = sortedDeps[i];
+      const config = tempConfigs.get(curDep)!;
 
       config.dependers.forEach(depender => {
-        const dependerConfig = configs.get(depender)!;
+        const dependerConfig = tempConfigs.get(depender)!;
         const index = dependerConfig.remaining.indexOf(curDep);
         if (index >= 0) dependerConfig.remaining.splice(index, 1);
         if (dependerConfig.remaining.length === 0) {
-          sortedConfigs.push(depender);
+          sortedDeps.push(depender);
         }
       });
     }
 
-    if (sortedConfigs.length !== dependencies.length) {
+    if (sortedDeps.length !== dependencies.length) {
       throw new Error('Missing Dependencies');
     }
 
-    return sortedConfigs;
+    return sortedDeps;
   }
 
   private _createRoleManager(configs: ContractConfigurationWithId[]) {
@@ -314,17 +335,27 @@ export class Environment {
     return roles;
   }
 
-  private async _grantRoles() {
-    const configs = await this.configs;
+  private async _grantRoles(configs: ContractConfigurationWithId[]) {
     const roles = await this._createRoleManager(configs);
 
     debug('granting roles...');
 
     for (const config of configs) {
-      const contract = this._contracts[config.id];
+      if (!this._canProgress(config.id)) {
+        continue;
+      }
 
+      const contract = this._contracts[config.id];
       if (!contract) {
         console.error('missing contract for', config.name);
+        this._registerError(
+          {
+            error: new Error('missing contract'),
+            details: 'grant roles failed',
+          },
+          config.id
+        );
+        continue;
       }
 
       debug('checking', config.name, !!config.requiredRoles);
@@ -340,38 +371,52 @@ export class Environment {
           }
         } catch (e: any) {
           // TODO add context to the rolesMapping
-          console.log('failed grant role for', config.name, '-', e.message);
+          console.log('failed grant role for', config.id);
+          this._registerError(
+            {
+              error: e,
+              details: 'grant roles failed',
+            },
+            config.id
+          );
         }
       }
     }
   }
 
-  private async _loadConfigurations(key?: keyof DetailedDependencies) {
-    const configs: ContractConfigurationWithId[] = [];
+  private async _prepareConfigurations() {
     const addressSuite: Record<string, string> = {};
+    const dependencies = await this._fetchDependencies();
 
-    debug('loading config...');
-
-    for (const {config} of await this._loadDependencies(key)) {
-      configs.push(
-        await this._parseConfig(
-          config,
+    debug('loading configs...');
+    for (const dependency of this._sortDependencies(dependencies, 'address')) {
+      try {
+        dependency.config = await this._parseConfig(
+          dependency.config,
           this.hre.config.environment.settings,
           addressSuite
-        )
-      );
+        );
+      } catch (e) {
+        console.error('failed loading config');
+        this._registerError({
+          error: e,
+          details: 'failed loading config',
+        });
+      }
     }
 
     debug('loaded configuration', addressSuite);
-    return {configs, addressSuite};
+    return {
+      dependencies: dependencies as DependencyConfigLoaded[],
+      addressSuite,
+    };
   }
 
-  private async _deployConfigurations(registry: Registry) {
-    const [configs, deployer] = await Promise.all([
-      this.configs,
-      this.deployer,
-      this.addresses,
-    ]);
+  private async _deployConfigurations(
+    configs: ContractConfigurationWithId[],
+    registry: Registry
+  ) {
+    const [deployer] = await Promise.all([this.deployer]);
 
     debug('deploying...');
 
@@ -384,22 +429,25 @@ export class Environment {
 
       try {
         await this._deployContract(config, deployer, registry, constructorId);
-      } catch (e: unknown) {
-        console.error(
-          'failed to deploy',
-          config.name,
-          ' - ',
-          (e as Error).message
+      } catch (e: any) {
+        console.error('failed to deploy', config.id);
+        this._registerError(
+          {
+            error: e,
+            details: 'deployment failed',
+            stopProgression: true,
+          },
+          config.id
         );
       }
     }
   }
 
-  private async _initialize(registry: Registry) {
-    const [configs, addresses] = await Promise.all([
-      this.configs,
-      this.addresses,
-    ]);
+  private async _initialize(
+    configs: ContractConfigurationWithId[],
+    registry: Registry
+  ) {
+    const [addresses] = await Promise.all([this.addresses]);
 
     debug('initializing...');
 
@@ -408,15 +456,18 @@ export class Environment {
       this.hre.config.environment.settings
     );
 
-    const passing: Record<string, boolean> = {};
-
     for (const config of configs) {
       const contract = this._contracts[config.id];
-      passing[config.id] = true;
 
       if (!contract) {
         console.error('missing contract for', config.id);
-        passing[config.id] = false;
+        this._registerError(
+          {
+            error: new Error('missing contract'),
+            details: 'initialize failed',
+          },
+          config.id
+        );
         continue;
       }
 
@@ -435,29 +486,35 @@ export class Environment {
               console.log('event initialized', config.id);
               await config.initialized.call(await this._createContext(config));
             } catch (e: any) {
-              console.error(
-                'event "initialized" failed for',
-                config.name,
-                '-',
-                e.message
+              console.error('event "initialized" failed for', config.id);
+              this._registerError(
+                {
+                  error: e,
+                  details: 'initialized event failed',
+                },
+                config.id
               );
             }
           }
         } catch (e: any) {
-          passing[config.id] = false;
-          console.error('failed initializing', config.name, '-', e.message, e);
+          console.error('failed initializing', config.id);
+          this._registerError(
+            {
+              error: e,
+              details: 'initialize failed',
+              stopProgression: true,
+            },
+            config.id
+          );
         }
       }
     }
-
-    return passing;
   }
 
   private async _configure(
-    passing: Record<string, boolean>,
+    configs: ContractConfigurationWithId[],
     registry: Registry
   ) {
-    const [configs] = await Promise.all([this.configs]);
     debug('configuring...');
 
     const configureId = await registry.registerSettings(
@@ -465,15 +522,14 @@ export class Environment {
     );
 
     for (const config of configs) {
-      await this._configureContract(config, configureId, registry, passing);
+      await this._configureContract(config, configureId, registry);
     }
   }
 
-  private async _finalize(passing: Record<string, boolean>) {
-    const [configs] = await Promise.all([this.configs]);
+  private async _finalize(configs: ContractConfigurationWithId[]) {
     const deployer = await this.deployer;
 
-    debug('finalizing...', passing);
+    debug('finalizing...');
 
     for (const config of configs) {
       if (config.finalize) {
@@ -482,6 +538,7 @@ export class Environment {
           await config.finalize.call(await this._createContext(config));
         } catch (e: any) {
           console.error('finalizing failed for', config.name, ' - ', e.message);
+          debug('stack:', e.stack);
         }
       }
     }
@@ -494,7 +551,7 @@ export class Environment {
         continue;
       }
 
-      if (!passing[config.id]) continue;
+      if (this._errors[config.id]) continue;
 
       if ('proxy' in config && config.proxy.owner) {
         console.log('transferring ownership', config.id);
@@ -510,11 +567,13 @@ export class Environment {
           console.log('event finalized', config.id);
           await config.finalized.call(await this._createContext(config));
         } catch (e: any) {
-          console.error(
-            'event finalized failed for',
-            config.name,
-            ' - ',
-            e.message
+          console.error('event finalized failed for ', config.id);
+          this._registerError(
+            {
+              error: e,
+              details: 'finalized event failed',
+            },
+            config.id
           );
         }
       }
@@ -527,7 +586,7 @@ export class Environment {
     registry: Registry,
     constructorId: string
   ): Promise<FactoryInstance<T>> {
-    const factory: T = await this._factory(config.id);
+    const factory: T = await this._factory(config.name);
     let contract: FactoryInstance<T>;
     let address: string;
     let options: DeployOptions<T> | undefined;
@@ -562,9 +621,9 @@ export class Environment {
 
     if ('proxy' in config) {
       debug('deployment is a proxy');
+      let signer: Signer | undefined;
       if (config.proxy.type === 'TransparentUpgradeableProxy') {
         let proxyAdmin = await this._getProxyAdmin(address);
-        let signer: Signer | undefined;
 
         try {
           if (proxyAdmin) {
@@ -589,6 +648,7 @@ export class Environment {
             proxyAdmin?.address,
             e.message
           );
+          debug('stack:', e.stack);
         }
 
         contract = await deployTransparentUpgradeableProxy(deployer, {
@@ -597,6 +657,8 @@ export class Environment {
           overrides: config.proxy.overrides,
           implementation: contract,
           signer,
+          initialize: config.proxy.initialize,
+          upgrade: config.proxy.upgrade,
           proxyAdmin: proxyAdmin ?? {
             id: config.proxy.proxyAdmin,
             salt: config.proxy.salt,
@@ -604,12 +666,37 @@ export class Environment {
           },
         });
       } else if (config.proxy.type === 'UpgradeableBeacon') {
-        contract = (await deployTemplate(deployer, 'UpgradeableBeacon', {
-          implementation: contract.address,
+        try {
+          const owner = await UpgradeableBeacon__factory.connect(
+            address,
+            deployer.signer
+          ).owner();
+          const code = await deployer.provider.getCode(owner);
+
+          // if there is a bytecode lets assume it is a proxy admin
+          if (hexDataLength(code) > 0) {
+            signer = await getSafeSigner(owner, deployer.signer);
+          } else if (
+            !BigNumber.from(owner).eq(await deployer.signer.getAddress())
+          ) {
+            signer = await this.hre.ethers.getSigner(owner);
+          }
+        } catch (e: any) {
+          console.error(
+            'failed getting signer for upgradeable beacon',
+            address,
+            e.message
+          );
+          debug('stack:', e.stack);
+        }
+
+        contract = await deployUpgradeableBeaconProxy(deployer, {
+          implementation: contract,
+          signer,
           owner: config.proxy.owner || deployer.signer.address,
           id: config.proxy.id || config.id,
           salt: config.proxy.salt,
-        })) as any; // TODO to fix this because it is expecting to return the contract but should get upgradeable beacon
+        }); // TODO to fix this because it is expecting to return the contract but should get upgradeable beacon
       } else {
         throw new Error('invalid proxy type "' + config.proxy['type'] + '"');
       }
@@ -629,6 +716,7 @@ export class Environment {
         ' - ',
         e.message
       );
+      debug('stack:', e.stack);
     }
     // }
 
@@ -667,8 +755,9 @@ export class Environment {
     let owner: string;
     try {
       owner = await contract.owner();
-    } catch (e) {
+    } catch (e: any) {
       console.error('failed getting owner for ' + address);
+      debug('stack:', e.stack);
       return;
     }
 
@@ -716,6 +805,7 @@ export class Environment {
           '\n' +
           e.message
       );
+      debug('stack:', e.stack);
     }
   }
 
@@ -780,8 +870,7 @@ export class Environment {
   private async _configureContract<T extends ContractFactory = ContractFactory>(
     config: ContractConfigurationWithId<T>,
     configureId: string,
-    registry: Registry,
-    passing?: Record<string, boolean>
+    registry: Registry
   ) {
     const contract = this._contracts[config.id];
 
@@ -789,30 +878,39 @@ export class Environment {
       console.error('missing contract for', config.id);
     }
 
-    if ((!passing || passing[config.id]) && config.configure && contract) {
-      try {
-        console.log('configuring', config.id);
-        await config.configure.call(await this._createContext(config));
-        registry.setConfigured(contract.address, configureId);
-        if (config.configured) {
-          try {
-            console.log('event configured', config.id);
-            await config.configured.call(await this._createContext(config));
-          } catch (e: any) {
-            console.error(
-              'event "configured" failed for',
-              config.name,
-              ' - ',
-              e.message
-            );
-          }
-        }
-      } catch (e: any) {
-        console.error('configure failed for', config.name, ' - ', e.message);
-        if (passing) {
-          passing[config.id] = false;
+    if (!this._canProgress(config.id) || !config.configure || !contract) {
+      return;
+    }
+
+    try {
+      console.log('configuring', config.id);
+      await config.configure.call(await this._createContext(config));
+      registry.setConfigured(contract.address, configureId);
+      if (config.configured) {
+        try {
+          console.log('event configured', config.id);
+          await config.configured.call(await this._createContext(config));
+        } catch (e: any) {
+          console.error('event "configured" failed for', config.name);
+          this._registerError(
+            {
+              details: 'configure event failed',
+              error: e,
+            },
+            config.id
+          );
         }
       }
+    } catch (e: any) {
+      console.error('configure failed for', config.name);
+      this._registerError(
+        {
+          details: 'configure failed',
+          error: e,
+          stopProgression: true,
+        },
+        config.id
+      );
     }
   }
 
@@ -821,14 +919,13 @@ export class Environment {
   }
 
   private async _prepareSettings(
-    stage: 'initialize' | 'configure' | 'finalize',
-    passing?: Record<string, boolean>
+    configs: ContractConfigurationWithId[],
+    stage: 'initialize' | 'configure' | 'finalize'
   ) {
-    const configs = await this.configs;
-    debug('preparing settings for ' + stage, passing);
+    debug('preparing settings for ' + stage);
 
     for (const config of configs) {
-      if (passing && !passing[config.id]) {
+      if (!this._canProgress(config.id)) {
         continue;
       }
 
@@ -858,7 +955,14 @@ export class Environment {
         if (result) this._updateSettings(result);
       } catch (e: any) {
         console.error('error preparing ' + stage, config.name, e.message);
-        if (passing) passing[config.id] = false;
+        this._registerError(
+          {
+            details: 'prepare settings for ' + stage,
+            error: e,
+            stopProgression: true,
+          },
+          config.id
+        );
       }
     }
   }
@@ -870,5 +974,36 @@ export class Environment {
         BigNumber.from(salt || deployer.defaultSalt).toHexString(),
       ])
     );
+  }
+
+  private _registerError(
+    details: ErrorDetails,
+    id: string | symbol = Symbol()
+  ) {
+    if (!this._errors[id]) {
+      this._errors[id] = [];
+    }
+
+    this._errors[id].push(details);
+  }
+
+  private _canProgress(id: string) {
+    return !this._errors[id]?.some(error => error.stopProgression);
+  }
+
+  private _checkErrors() {
+    const errors: string[] = [];
+    Object.entries(this._errors).forEach(([id, errorDetails]) => {
+      errorDetails.forEach(({details, error, context}) => {
+        const message = error?.message || error?.toString() || `${error}`;
+        const errorString = `[${id}] ${details}. ${message}`;
+        console.error(errorString, context);
+        console.error(error);
+        errors.push(errorString);
+      });
+    });
+    if (errors.length > 0) {
+      throw new Error('[UPGRADE FAILED]\n' + errors.join('\n'));
+    }
   }
 }

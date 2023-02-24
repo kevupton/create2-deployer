@@ -1,47 +1,38 @@
 import {Contract, Signer} from 'ethers';
 import {debug} from '../../utils';
-import Safe from '@safe-global/safe-core-sdk';
 import {Deployer, DeployTemplateOptions} from '../deployer';
-import {getProxyAdmin, GetProxyAdminOptions} from './get-proxy-admin';
-import {upgradeTransparentUpgradeableProxy} from './upgrade-transparent-upgradeable-proxy';
 import {
   getImplementation,
   GetImplementationOptions,
 } from './get-implementation';
-import {encodeFunctionCall, FunctionCallOptions} from './encode-function-call';
 import {deployTemplate} from './deploy-template';
+import {upgradeUpgradeableBeaconProxy} from './upgrade-upgradeable-beacon-proxy';
 
-export type TransparentUpgradeableProxyHelperOptions<T extends Contract> =
+export type DeployUpgradeableBeaconOptions<T extends Contract> =
   DeployTemplateOptions & {
+    owner?: string;
     implementation: GetImplementationOptions<T>;
-    proxyAdmin?: GetProxyAdminOptions;
-    upgrade?: FunctionCallOptions<T>;
-    initialize?: FunctionCallOptions<T>;
     signer?: Signer;
   };
 
-export const deployTransparentUpgradeableProxy = async <T extends Contract>(
+export const deployUpgradeableBeaconProxy = async <T extends Contract>(
   deployer: Deployer,
   {
-    proxyAdmin,
+    owner,
     implementation,
-    initialize,
-    upgrade,
     signer,
     id,
     salt,
     overrides,
-  }: TransparentUpgradeableProxyHelperOptions<T>
+  }: DeployUpgradeableBeaconOptions<T>
 ) => {
-  proxyAdmin = await getProxyAdmin(deployer, proxyAdmin);
   implementation = await getImplementation(deployer, implementation);
 
   // deploy the proxy, or retrieve the proxy instance if it is already deployed.
-  debug('deploying proxy');
-  const proxy = await deployTemplate(deployer, 'TransparentUpgradeableProxy', {
-    logic: implementation.address,
-    admin: proxyAdmin.address,
-    data: encodeFunctionCall(implementation.interface, initialize),
+  debug('deploying proxy, UpgradeableBeacon');
+  const proxy = await deployTemplate(deployer, 'UpgradeableBeacon', {
+    implementation: implementation.address,
+    owner: owner || deployer.signer.address,
     id,
     salt,
     overrides,
@@ -49,12 +40,10 @@ export const deployTransparentUpgradeableProxy = async <T extends Contract>(
   await proxy.deployed();
 
   // upgrade the proxy if we need to
-  await upgradeTransparentUpgradeableProxy(deployer, {
-    proxy,
-    proxyAdmin,
+  await upgradeUpgradeableBeaconProxy(deployer, {
+    beacon: proxy,
     implementation,
     signer,
-    call: upgrade,
   });
 
   const result = implementation.attach(proxy.address) as T;
