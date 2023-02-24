@@ -25,6 +25,7 @@ import {PromiseOrValue} from '../../typechain-types/common';
 import {CREATE2_DEPLOYER_ADDRESS} from './constants';
 import {InstanceFactory, FactoryInstance} from './types';
 import {debug, wait} from '../utils';
+import {getOverrides} from './helpers';
 
 export type Head<T extends unknown[]> = T extends [
   ...other: infer Head,
@@ -107,7 +108,7 @@ export class Deployer {
       args,
       calls = [],
       salt = this.defaultSalt,
-      overrides = {},
+      overrides,
     }: DeployOptions<T> = {}
   ): Promise<FactoryInstance<T>> {
     await this.validate('deploy', factory);
@@ -125,7 +126,7 @@ export class Deployer {
         bytecode,
         this.generateSalt(id, salt),
         await Deployer.formatCalls(calls, contractAddress),
-        overrides
+        getOverrides(overrides, this.provider)
       );
       Object.defineProperty(contract, 'deployTransaction', {
         writable: false,
@@ -138,7 +139,7 @@ export class Deployer {
 
   async clone(
     target: string,
-    {id, salt, overrides = {}}: CloneOptions = {}
+    {id, salt, overrides}: CloneOptions = {}
   ): Promise<{
     address: string;
     deployed: Promise<string>;
@@ -157,7 +158,7 @@ export class Deployer {
       const tx = await this.create2Deployer.clone(
         target,
         this.generateSalt(id, salt),
-        overrides
+        getOverrides(overrides, this.provider)
       );
       return {
         address: contractAddress,
@@ -170,12 +171,7 @@ export class Deployer {
   async deployArtifact(
     artifact: Artifact,
     args: BytesLike = '0x',
-    {
-      id,
-      salt = this.defaultSalt,
-      calls = [],
-      overrides = {},
-    }: DeployArtifactOptions
+    {id, salt = this.defaultSalt, calls = [], overrides}: DeployArtifactOptions
   ): Promise<Contract> {
     await this.validate('deployArtifact', artifact);
     const bytecode = hexConcat([artifact.bytecode, args]);
@@ -190,7 +186,7 @@ export class Deployer {
         bytecode,
         this.generateSalt(id, salt),
         await Deployer.formatCalls(calls, contractAddress),
-        overrides
+        getOverrides(overrides, this.provider)
       );
       contract._deployedPromise = wait(tx).then(() => contract);
       Object.defineProperty(contract, 'deployTransaction', {
@@ -229,11 +225,13 @@ export class Deployer {
 
   async deployTemplate(
     templateId: PromiseOrValue<BytesLike>,
-    {id, salt, calls = [], overrides = {}}: DeployTemplateOptions = {}
+    {id, salt, calls = [], overrides}: DeployTemplateOptions = {}
   ) {
     await this.validate('deployTemplate', templateId);
     const contractAddress = await this.templateAddress(templateId, {id, salt});
     const code = await this.provider.getCode(contractAddress);
+
+    debug('deploying template ' + templateId);
 
     if (hexDataLength(code)) {
       return;
@@ -244,8 +242,12 @@ export class Deployer {
         templateId,
         this.generateSalt(id, salt),
         await Deployer.formatCalls(calls, contractAddress),
-        overrides
+        getOverrides(overrides, this.provider)
       )
+      .then(tx => {
+        debug('hash: ' + tx.hash);
+        return tx;
+      })
       .then(wait);
   }
 
@@ -256,7 +258,7 @@ export class Deployer {
       salt,
       calls = [],
       args,
-      overrides = {},
+      overrides,
     }: DeployTemplateFromFactoryOptions<T> = {}
   ) {
     await this.validate('deployTemplateFromFactory', factory);
@@ -266,7 +268,7 @@ export class Deployer {
       salt,
       args,
     });
-    debug('templateId ' + templateId);
+    debug('deploying template ' + templateId);
     const code = await this.provider.getCode(contractAddress);
     const contract = factory
       .connect(this.signer)
@@ -279,7 +281,7 @@ export class Deployer {
         templateId,
         this.generateSalt(id, salt),
         await Deployer.formatCalls(calls, contractAddress),
-        overrides
+        getOverrides(overrides, this.provider)
       );
       Object.defineProperty(contract, 'deployTransaction', {
         writable: false,
@@ -292,15 +294,23 @@ export class Deployer {
 
   async createTemplate<T extends ContractFactory>(
     factory: T,
-    {args, overrides = {}}: CreateTemplateOptions<T> = {}
+    {args, overrides}: CreateTemplateOptions<T> = {}
   ) {
     await this.validate('deploy', factory);
     const templateId = Deployer.templateId(factory, args);
-    const template = await this.create2Deployer.template(templateId);
+    const exists = await this.create2Deployer.templateExists(templateId);
+    debug('creating template ' + factory.constructor.name);
 
-    if (!hexDataLength(template)) {
+    if (!exists) {
       await this.create2Deployer
-        .createTemplate(Deployer.bytecode(factory, args), overrides)
+        .createTemplate(
+          Deployer.bytecode(factory, args),
+          getOverrides(overrides, this.provider)
+        )
+        .then(tx => {
+          debug('hash: ' + tx.hash);
+          return tx;
+        })
         .then(wait);
     }
 

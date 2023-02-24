@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.18;
+pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
@@ -9,6 +9,7 @@ import "@openzeppelin/contracts/proxy/Clones.sol";
 contract Create2Deployer {
     using Address for address;
 
+    event TemplateCreated(bytes32 indexed id);
     event Deployed(address indexed target);
     event Call(address indexed target, bytes data, bytes result);
 
@@ -40,6 +41,10 @@ contract Create2Deployer {
         return keccak256(bytecode);
     }
 
+    function templateExists(bytes32 _templateId) public view returns (bool) {
+        return template[_templateId].length > 0;
+    }
+
     function deploy(bytes memory bytecode, uint256 salt, FunctionCall[] calldata calls) public returns (address addr) {
         assembly {
             addr := create2(0, add(bytecode, 0x20), mload(bytecode), salt)
@@ -65,7 +70,9 @@ contract Create2Deployer {
 
     function createTemplate(bytes calldata bytecode) external returns (bytes32 _templateId) {
         _templateId = templateId(bytecode);
+        require(!templateExists(_templateId), 'TEMPLATE_EXISTS');
         template[_templateId] = bytecode;
+        emit TemplateCreated(_templateId);
     }
 
     function call(FunctionCall[] calldata calls) public returns (bytes[] memory results) {

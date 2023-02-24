@@ -1,10 +1,10 @@
-import {ethers, run} from 'hardhat';
+import {ethers} from 'hardhat';
 import {CREATE2_DEPLOYER_ADDRESS, Deployer} from '../src/deployer';
+import {verify} from '../src/hardhat/verify';
 import {
   DeploymentRegistry__factory,
   Placeholder__factory,
 } from '../typechain-types';
-import {Overrides} from 'ethers';
 
 async function main() {
   const [signer] = await ethers.getSigners();
@@ -16,8 +16,10 @@ async function main() {
 
   const deployerAddress = CREATE2_DEPLOYER_ADDRESS;
   try {
+    const gasPrice = await signer.getGasPrice();
     const create2Deployer = await create2DeployerFactory.deploy({
       nonce: 0,
+      gasPrice: gasPrice.mul(2),
     });
     await create2Deployer.deployed();
     console.log('deployer', create2Deployer.address);
@@ -30,14 +32,11 @@ async function main() {
   const deployer = new Deployer(signer);
   console.log('deployer', deployer.address);
 
-  const overrides: Overrides = {
-    //   nonce: 6,
-    //   gasPrice: parseUnits('50', 'gwei'),
-  };
-
   const placeholder = await deployer.deploy(new Placeholder__factory(), {
     salt: 0,
-    overrides,
+    overrides: {
+      nonce: 1,
+    },
   });
   console.log(
     'placeholder',
@@ -50,7 +49,9 @@ async function main() {
     new DeploymentRegistry__factory(signer),
     {
       salt: 0,
-      overrides,
+      overrides: {
+        nonce: 2,
+      },
     }
   );
   console.log(
@@ -60,23 +61,15 @@ async function main() {
   );
   await deploymentRegistry.deployed();
 
-  await new Promise(res => setTimeout(res, 10000));
   console.log('verifying...');
-
   if (deploymentRegistry.deployTransaction || placeholder.deployTransaction) {
-    await new Promise(res => setTimeout(res, 30000));
+    await new Promise(res => setTimeout(res, 10000));
   }
 
   await Promise.all([
-    run('verify:verify', {
-      address: placeholder.address,
-    }).catch(e => console.error(e.message)),
-    run('verify:verify', {
-      address: deploymentRegistry.address,
-    }).catch(e => console.error(e.message)),
-    run('verify:verify', {
-      address: deployerAddress,
-    }).catch(e => console.error(e.message)),
+    verify({address: placeholder.address}),
+    verify({address: deploymentRegistry.address}),
+    verify({address: deployerAddress}),
   ]);
 }
 

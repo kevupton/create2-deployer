@@ -1,6 +1,7 @@
 import {ContractFactoryType} from '../types';
 import {Deployer} from '../deployer';
 import {Template} from './index';
+import {debug} from '../../utils';
 
 export interface TemplateDeployment {
   id: string;
@@ -21,6 +22,8 @@ export async function deployTemplates(deployer: Deployer) {
     const name = factory.name.replace('__factory', '');
     const templateId = Deployer.templateId(instance);
     const address = deployer.factoryAddress(instance, {salt: 0});
+
+    debug('deploying template ' + name, templateId, address);
 
     templateIds[name] = templateId;
 

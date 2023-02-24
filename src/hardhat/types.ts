@@ -9,6 +9,7 @@ import {DeploymentInfo, Registry} from './registry';
 import {HardhatRuntimeEnvironment} from 'hardhat/types';
 import {FactoryInstance} from '../deployer/types';
 import {PromiseOrValue} from '../../typechain-types/common';
+import {Libraries} from '@nomiclabs/hardhat-ethers/types';
 
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface EnvironmentSettings {}
@@ -143,4 +144,13 @@ export interface DependencyConfigLoaded<
 > {
   config: ContractConfigurationWithId<T>;
   deps?: DependencyConfigLoaded[] | DetailedDependenciesLoaded;
+}
+
+export interface VerificationSubtaskArgs {
+  address: string;
+  constructorArguments?: any[];
+  // Fully qualified name of the contract
+  contract?: string;
+  libraries?: Libraries;
+  noCompile?: boolean;
 }
