@@ -2,6 +2,7 @@ import {extendConfig, extendEnvironment} from 'hardhat/config';
 import path from 'path';
 import {Environment} from './environment';
 import {EnvironmentSettings} from './types';
+import {verify, VerifyOptions} from './verify';
 
 export interface Create2Variable {
   file: string;
@@ -21,6 +22,7 @@ export interface Create2Environment {
 declare module 'hardhat/types/runtime' {
   export interface HardhatRuntimeEnvironment {
     environment: Environment;
+    verify(options: VerifyOptions): Promise<void>;
   }
 }
 
@@ -64,4 +66,5 @@ extendConfig((config, userConfig) => {
 
 extendEnvironment(hre => {
   hre.environment = new Environment(hre);
+  hre.verify = options => verify(hre, options);
 });

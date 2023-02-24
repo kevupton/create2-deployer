@@ -4,6 +4,7 @@ import '@nomicfoundation/hardhat-toolbox';
 import '@nomiclabs/hardhat-ethers';
 import '@typechain/hardhat';
 import 'hardhat-package';
+import './src/hardhat';
 
 const {PRIVATE_KEY, INFURA_API_KEY, ETHERSCAN_API_KEY} = process.env;
 

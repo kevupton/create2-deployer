@@ -1,6 +1,5 @@
-import {ethers} from 'hardhat';
+import {ethers, verify} from 'hardhat';
 import {CREATE2_DEPLOYER_ADDRESS, Deployer} from '../src/deployer';
-import {verify} from '../src/hardhat/verify';
 import {
   DeploymentRegistry__factory,
   Placeholder__factory,
@@ -67,9 +66,9 @@ async function main() {
   }
 
   await Promise.all([
-    verify({address: placeholder.address}),
-    verify({address: deploymentRegistry.address}),
-    verify({address: deployerAddress}),
+    verify({name: 'Placeholder', address: placeholder.address}),
+    verify({name: 'DeploymentRegistry', address: deploymentRegistry.address}),
+    verify({name: 'Deployer', address: deployerAddress}),
   ]);
 }
 

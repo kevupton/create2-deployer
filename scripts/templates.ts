@@ -1,7 +1,6 @@
-import {ethers, run} from 'hardhat';
+import {ethers, verify} from 'hardhat';
 import {Deployer} from '../src/deployer';
 import {deployTemplates} from '../src/deployer/templates/deploy-templates';
-import {verify} from '../src/hardhat/verify';
 
 async function main() {
   const [signer] = await ethers.getSigners();
@@ -15,7 +14,7 @@ async function main() {
   await Promise.all(
     Object.values(results).map(async ({address, name}) => {
       console.log('verifying', name);
-      return verify({address});
+      return verify({name, address});
     })
   );
 }

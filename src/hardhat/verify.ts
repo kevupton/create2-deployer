@@ -1,5 +1,5 @@
-import {run} from 'hardhat';
 import {VerificationSubtaskArgs} from './types';
+import {HardhatRuntimeEnvironment} from 'hardhat/types';
 
 export interface VerifyOptions extends VerificationSubtaskArgs {
   name?: string;
@@ -8,17 +8,20 @@ export interface VerifyOptions extends VerificationSubtaskArgs {
   randomInterval?: boolean;
 }
 
-export async function verify({
-  name,
-  attempts = 3,
-  interval = 3000,
-  randomInterval = true,
-  ...options
-}: VerifyOptions) {
+export async function verify(
+  hre: HardhatRuntimeEnvironment,
+  {
+    name,
+    attempts = 3,
+    interval = 3000,
+    randomInterval = true,
+    ...options
+  }: VerifyOptions
+) {
   const logs: Error[] = [];
   for (let i = 0; i < attempts; i++) {
     try {
-      return await run('verify:verify', {
+      return await hre.run('verify:verify', {
         noCompile: true,
         ...options,
       });
