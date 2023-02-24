@@ -12,19 +12,22 @@ export const upgradeableBeaconTemplate: TemplateConfig<
   UpgradeableBeacon__factory,
   UpgradeableBeaconDeployOptions
 > = {
-  factory: UpgradeableBeacon__factory,
-  demoData: {
-    implementation: PLACEHOLDER_ADDRESS,
-    owner: PLACEHOLDER_ADDRESS,
-  },
+  Factory: UpgradeableBeacon__factory,
+  args: [PLACEHOLDER_ADDRESS],
   createOptions({implementation, owner, calls = [], ...options}) {
     return {
       ...options,
-      args: [implementation],
-      calls: [transferOwnership(owner), ...calls],
+      calls: [upgradeTo(implementation), transferOwnership(owner), ...calls],
     };
   },
 };
+
+function upgradeTo(implementation: PromiseOrValue<string>) {
+  return UpgradeableBeacon__factory.createInterface().encodeFunctionData(
+    'upgradeTo',
+    [implementation]
+  );
+}
 
 function transferOwnership(owner: PromiseOrValue<string>) {
   return UpgradeableBeacon__factory.createInterface().encodeFunctionData(

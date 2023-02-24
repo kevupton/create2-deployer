@@ -8,21 +8,18 @@ async function main() {
   const deployer = new Deployer(signer);
   const verifyCommands: (() => Promise<void>)[] = [];
 
-  for (const [name, {factory, createOptions, demoData}] of Object.entries(
-    Template
-  )) {
-    const instance = new factory();
-    const options = createOptions(demoData as any);
-    const address = deployer.factoryAddress(instance, options);
+  for (const [name, {Factory, args}] of Object.entries(Template)) {
+    const instance = new Factory();
+    const address = deployer.factoryAddress(instance, {args, salt: 0});
 
     console.log('deploying template', name, address);
 
     verifyCommands.push(async () => {
       console.log('verifying', name);
-      return verify({name, address, constructorArguments: options.args});
+      return verify({name, address, constructorArguments: args});
     });
 
-    const contract = await deployer.deploy(instance, options);
+    const contract = await deployer.deploy(instance, {args, salt: 0});
     await contract.deployed();
   }
 

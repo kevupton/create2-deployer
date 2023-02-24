@@ -1,6 +1,5 @@
 import {ProxyAdmin__factory} from '../../proxy';
 import {TemplateConfig} from './types';
-import {PLACEHOLDER_ADDRESS} from '../constants';
 
 export interface ProxyAdminDeployOptions {
   owner: string;
@@ -10,10 +9,7 @@ export const proxyAdminTemplate: TemplateConfig<
   ProxyAdmin__factory,
   ProxyAdminDeployOptions
 > = {
-  factory: ProxyAdmin__factory,
-  demoData: {
-    owner: PLACEHOLDER_ADDRESS,
-  },
+  Factory: ProxyAdmin__factory,
   createOptions({owner, calls = [], ...options}) {
     return {
       ...options,

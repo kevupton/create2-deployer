@@ -7,6 +7,7 @@ import {
   TemplateInstance,
 } from '../templates';
 import {debug} from '../../utils';
+import {getTemplateAddress} from './get-template-address';
 
 export async function deployTemplate<K extends TemplateID>(
   deployer: Deployer,
@@ -14,11 +15,15 @@ export async function deployTemplate<K extends TemplateID>(
   options: TemplateCreateOptions<K>
 ): Promise<FactoryInstance<TemplateInstance<K>>> {
   debug('deploying template ' + id);
-  const config = Template[id];
-  const factory = new config.factory();
+  const target = getTemplateAddress(deployer, id, options);
+  const {Factory, createOptions} = Template[id];
+  const factory = new Factory();
   const contract = await deployer.deploy(
     factory,
-    config.createOptions(options as any)
+    createOptions({
+      ...(options as any),
+      target,
+    })
   );
   await contract.deployed();
   return contract as any;

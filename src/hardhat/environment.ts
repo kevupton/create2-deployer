@@ -45,6 +45,7 @@ import {getSafeSigner} from '../deployer/helpers/get-safe-signer';
 import {deployUpgradeableBeaconProxy} from '../deployer/helpers/deploy-upgradeable-beacon';
 
 export interface ErrorDetails {
+  id?: string;
   error: any;
   details: string;
   context?: Record<string, unknown>;
@@ -69,7 +70,7 @@ export class Environment {
   >();
   private _contracts: Record<string, Contract> = {};
   private _settings: EnvironmentSettings;
-  private _errors: Record<string | symbol, ErrorDetails[]> = {};
+  private _errors: ErrorDetails[] = [];
 
   constructor(public readonly hre: HardhatRuntimeEnvironment) {
     this._ready = this._prepareConfigurations();
@@ -115,7 +116,7 @@ export class Environment {
 
     debug('address suite', addresses);
     this._contracts = {};
-    this._errors = {};
+    this._errors = [];
 
     let configs = await this._sortConfigurations('deploy');
     await this._deployConfigurations(configs, registry);
@@ -345,13 +346,11 @@ export class Environment {
       const contract = this._contracts[config.id];
       if (!contract) {
         console.error('missing contract for', config.name);
-        this._registerError(
-          {
-            error: new Error('missing contract'),
-            details: 'grant roles failed',
-          },
-          config.id
-        );
+        this._errors.push({
+          id: config.id,
+          error: new Error('missing contract'),
+          details: 'grant roles failed',
+        });
         continue;
       }
 
@@ -369,13 +368,11 @@ export class Environment {
         } catch (e: any) {
           // TODO add context to the rolesMapping
           console.log('failed grant role for', config.id);
-          this._registerError(
-            {
-              error: e,
-              details: 'grant roles failed',
-            },
-            config.id
-          );
+          this._errors.push({
+            id: config.id,
+            error: e,
+            details: 'grant roles failed',
+          });
         }
       }
     }
@@ -387,19 +384,11 @@ export class Environment {
 
     debug('loading configs...');
     for (const dependency of this._sortDependencies(dependencies, 'address')) {
-      try {
-        dependency.config = await this._parseConfig(
-          dependency.config,
-          this.hre.config.environment.settings,
-          addressSuite
-        );
-      } catch (e) {
-        console.error('failed loading config');
-        this._registerError({
-          error: e,
-          details: 'failed loading config',
-        });
-      }
+      dependency.config = await this._parseConfig(
+        dependency.config,
+        this.hre.config.environment.settings,
+        addressSuite
+      );
     }
 
     debug('loaded configuration', addressSuite);
@@ -428,14 +417,12 @@ export class Environment {
         await this._deployContract(config, deployer, registry, constructorId);
       } catch (e: any) {
         console.error('failed to deploy', config.id);
-        this._registerError(
-          {
-            error: e,
-            details: 'deployment failed',
-            stopProgression: true,
-          },
-          config.id
-        );
+        this._errors.push({
+          id: config.id,
+          error: e,
+          details: 'deployment failed',
+          stopProgression: true,
+        });
       }
     }
   }
@@ -458,13 +445,11 @@ export class Environment {
 
       if (!contract) {
         console.error('missing contract for', config.id);
-        this._registerError(
-          {
-            error: new Error('missing contract'),
-            details: 'initialize failed',
-          },
-          config.id
-        );
+        this._errors.push({
+          id: config.id,
+          error: new Error('missing contract'),
+          details: 'initialize failed',
+        });
         continue;
       }
 
@@ -484,25 +469,21 @@ export class Environment {
               await config.initialized.call(await this._createContext(config));
             } catch (e: any) {
               console.error('event "initialized" failed for', config.id);
-              this._registerError(
-                {
-                  error: e,
-                  details: 'initialized event failed',
-                },
-                config.id
-              );
+              this._errors.push({
+                id: config.id,
+                error: e,
+                details: 'initialized event failed',
+              });
             }
           }
         } catch (e: any) {
           console.error('failed initializing', config.id);
-          this._registerError(
-            {
-              error: e,
-              details: 'initialize failed',
-              stopProgression: true,
-            },
-            config.id
-          );
+          this._errors.push({
+            id: config.id,
+            error: e,
+            details: 'initialize failed',
+            stopProgression: true,
+          });
         }
       }
     }
@@ -548,7 +529,7 @@ export class Environment {
         continue;
       }
 
-      if (this._errors[config.id]) continue;
+      if (!this._canProgress(config.id)) continue;
 
       if ('proxy' in config && config.proxy.owner) {
         console.log('transferring ownership', config.id);
@@ -565,13 +546,11 @@ export class Environment {
           await config.finalized.call(await this._createContext(config));
         } catch (e: any) {
           console.error('event finalized failed for ', config.id);
-          this._registerError(
-            {
-              error: e,
-              details: 'finalized event failed',
-            },
-            config.id
-          );
+          this._errors.push({
+            id: config.id,
+            error: e,
+            details: 'finalized event failed',
+          });
         }
       }
     }
@@ -888,25 +867,21 @@ export class Environment {
           await config.configured.call(await this._createContext(config));
         } catch (e: any) {
           console.error('event "configured" failed for', config.name);
-          this._registerError(
-            {
-              details: 'configure event failed',
-              error: e,
-            },
-            config.id
-          );
+          this._errors.push({
+            id: config.id,
+            details: 'configure event failed',
+            error: e,
+          });
         }
       }
     } catch (e: any) {
       console.error('configure failed for', config.name);
-      this._registerError(
-        {
-          details: 'configure failed',
-          error: e,
-          stopProgression: true,
-        },
-        config.id
-      );
+      this._errors.push({
+        id: config.id,
+        details: 'configure failed',
+        error: e,
+        stopProgression: true,
+      });
     }
   }
 
@@ -951,14 +926,12 @@ export class Environment {
         if (result) this._updateSettings(result);
       } catch (e: any) {
         console.error('error preparing ' + stage, config.name, e.message);
-        this._registerError(
-          {
-            details: 'prepare settings for ' + stage,
-            error: e,
-            stopProgression: true,
-          },
-          config.id
-        );
+        this._errors.push({
+          id: config.id,
+          details: 'prepare settings for ' + stage,
+          error: e,
+          stopProgression: true,
+        });
       }
     }
   }
@@ -972,31 +945,20 @@ export class Environment {
     );
   }
 
-  private _registerError(
-    details: ErrorDetails,
-    id: string | symbol = Symbol()
-  ) {
-    if (!this._errors[id]) {
-      this._errors[id] = [];
-    }
-
-    this._errors[id].push(details);
-  }
-
   private _canProgress(id: string) {
-    return !this._errors[id]?.some(error => error.stopProgression);
+    return !this._errors?.some(
+      error => error.id === id && error.stopProgression
+    );
   }
 
   private _checkErrors() {
     const errors: string[] = [];
-    Object.entries(this._errors).forEach(([id, errorDetails]) => {
-      errorDetails.forEach(({details, error, context}) => {
-        const message = error?.message || error?.toString() || `${error}`;
-        const errorString = `[${id}] ${details}. ${message}`;
-        console.error(errorString, context);
-        console.error(error);
-        errors.push(errorString);
-      });
+    this._errors.reverse().forEach(({details, error, context, id}) => {
+      const message = error?.message || error?.toString() || `${error}`;
+      const errorString = `${id ? `[${id}] ` : ''}${details}. ${message}`;
+      console.error(errorString, context);
+      console.error(error);
+      errors.push(errorString);
     });
     if (errors.length > 0) {
       throw new Error('[UPGRADE FAILED]\n' + errors.join('\n'));
