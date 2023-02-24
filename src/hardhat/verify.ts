@@ -28,7 +28,7 @@ export async function verify(
     } catch (e: any) {
       console.error(name || options.address, e.message);
       if (
-        e.message?.includes('already verified') ||
+        e.message?.toLowerCase().includes('already verified') ||
         e.message?.includes(
           "but its bytecode doesn't match any of your local contracts."
         )
