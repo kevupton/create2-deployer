@@ -28,7 +28,7 @@ contract TestDeployer is Test {
         Placeholder placeholderInstance = new Placeholder();
         code = address(placeholderInstance).code;
         vm.etch(PLACEHOLDER_ADDRESS, code);
-        placeholder = Placeholder(PLACEHOLDER_ADDRESS);
+        placeholder = Placeholder(payable(PLACEHOLDER_ADDRESS));
 
         // deploy the placeholder at a specific address
         DeploymentRegistry deploymentRegistryInstance = new DeploymentRegistry();
