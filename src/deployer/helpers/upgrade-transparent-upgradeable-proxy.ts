@@ -1,10 +1,6 @@
 import {Deployer} from '../deployer';
 import {BigNumber, Contract, Signer} from 'ethers';
-import {ProxyAdmin} from '../../../typechain-types/contracts/proxy';
-import Safe from '@safe-global/safe-core-sdk';
 import {debug, wait} from '../../utils';
-import SafeServiceClient from '@safe-global/safe-service-client';
-import {getSafeSigner} from './get-safe-signer';
 import {TransactionResponse} from '@ethersproject/providers';
 import {getProxyAdmin, GetProxyAdminOptions} from './get-proxy-admin';
 import {

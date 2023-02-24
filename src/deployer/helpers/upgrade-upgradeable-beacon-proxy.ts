@@ -1,20 +1,11 @@
 import {Deployer} from '../deployer';
 import {BigNumber, Contract, Signer} from 'ethers';
-import {
-  ProxyAdmin,
-  UpgradeableBeacon,
-} from '../../../typechain-types/contracts/proxy';
-import Safe from '@safe-global/safe-core-sdk';
+import {UpgradeableBeacon} from '../../proxy';
 import {debug, wait} from '../../utils';
-import SafeServiceClient from '@safe-global/safe-service-client';
-import {getSafeSigner} from './get-safe-signer';
-import {TransactionResponse} from '@ethersproject/providers';
-import {getProxyAdmin, GetProxyAdminOptions} from './get-proxy-admin';
 import {
   getImplementation,
   GetImplementationOptions,
 } from './get-implementation';
-import {encodeFunctionCall, FunctionCallOptions} from './encode-function-call';
 import {SafeEthersSigner} from '@safe-global/safe-ethers-adapters';
 
 export interface UpgradeUpgradeableBeaconProxyOptions<T extends Contract> {

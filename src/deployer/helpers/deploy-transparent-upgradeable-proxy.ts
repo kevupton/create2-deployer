@@ -1,6 +1,5 @@
 import {Contract, Signer} from 'ethers';
 import {debug} from '../../utils';
-import Safe from '@safe-global/safe-core-sdk';
 import {Deployer, DeployTemplateOptions} from '../deployer';
 import {getProxyAdmin, GetProxyAdminOptions} from './get-proxy-admin';
 import {upgradeTransparentUpgradeableProxy} from './upgrade-transparent-upgradeable-proxy';

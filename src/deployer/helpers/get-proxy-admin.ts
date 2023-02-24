@@ -1,6 +1,6 @@
 import {Deployer} from '../deployer';
 import {PromiseOrValue} from '../../../typechain-types/common';
-import {ProxyAdmin} from '../../../typechain-types/contracts/proxy';
+import {ProxyAdmin} from '../../proxy';
 import {deployTemplate} from './deploy-template';
 import {TemplateCreateOptions} from '../templates';
 
