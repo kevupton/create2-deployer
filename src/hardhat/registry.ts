@@ -6,6 +6,7 @@ import {BigNumber, BytesLike, constants, Contract} from 'ethers';
 import {hexDataLength, keccak256, toUtf8Bytes} from 'ethers/lib/utils';
 import {debug, wait} from '../utils';
 import {Deployer} from '../deployer';
+import {retry} from '../utils/retry';
 
 export interface PendingCall {
   test: () => Promise<void>;
@@ -232,15 +233,24 @@ export class Registry {
       return;
     }
 
-    const tx = await this.contract.provider.getTransaction(
-      contract.deployTransaction.hash
+    // try to get the deploy transaction hash
+    const blockNumber = await retry(
+      async () => {
+        const tx = await this.contract.provider.getTransaction(
+          contract.deployTransaction.hash
+        );
+        if (!tx.blockNumber) {
+          throw new Error('missing block number from deploy transaction');
+        }
+        return tx.blockNumber;
+      },
+      {
+        interval: 12000,
+        attempts: 6,
+      }
     );
 
-    if (!tx.blockNumber) {
-      throw new Error('missing block number from deploy transaction');
-    }
-
-    const block = await this.contract.provider.getBlock(tx.blockNumber);
+    const block = await this.contract.provider.getBlock(blockNumber);
 
     this.pendingDeployments[contract.address] = {
       hash: contract.deployTransaction.hash,
