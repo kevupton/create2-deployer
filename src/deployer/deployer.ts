@@ -128,6 +128,7 @@ export class Deployer {
         await Deployer.formatCalls(calls, contractAddress),
         getOverrides(overrides, this.provider)
       );
+      contract._deployedPromise = wait(tx).then(() => contract);
       Object.defineProperty(contract, 'deployTransaction', {
         writable: false,
         value: tx,
@@ -283,6 +284,7 @@ export class Deployer {
         await Deployer.formatCalls(calls, contractAddress),
         getOverrides(overrides, this.provider)
       );
+      contract._deployedPromise = wait(tx).then(() => contract);
       Object.defineProperty(contract, 'deployTransaction', {
         writable: false,
         value: tx,
