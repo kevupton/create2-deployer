@@ -62,9 +62,17 @@ async function main() {
 
   console.log('verifying...');
   await Promise.all([
-    verify({name: 'Placeholder', address: placeholder.address}),
-    verify({name: 'DeploymentRegistry', address: deploymentRegistry.address}),
-    verify({name: 'Deployer', address: deployerAddress}),
+    verify({
+      name: 'Placeholder',
+      address: placeholder.address,
+      noCompile: true,
+    }),
+    verify({
+      name: 'DeploymentRegistry',
+      address: deploymentRegistry.address,
+      noCompile: true,
+    }),
+    verify({name: 'Deployer', address: deployerAddress, noCompile: true}),
   ]);
 }
 

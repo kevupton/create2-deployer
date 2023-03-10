@@ -38,9 +38,13 @@ import {
 } from 'ethers/lib/utils';
 import Safe from '@safe-global/safe-core-sdk';
 import EthersAdapter from '@safe-global/safe-ethers-lib';
-import {ProxyAdmin__factory, UpgradeableBeacon__factory} from '../proxy';
+import {
+  ProxyAdmin__factory,
+  TransparentUpgradeableProxy__factory,
+  UpgradeableBeacon__factory,
+} from '../proxy';
 import {getAdminAddress} from '@openzeppelin/upgrades-core';
-import {FactoryInstance} from '../deployer/types';
+import {ContractFactoryType, FactoryInstance} from '../deployer/types';
 import {getSafeSigner} from '../deployer/helpers/get-safe-signer';
 import {deployUpgradeableBeaconProxy} from '../deployer/helpers/deploy-upgradeable-beacon';
 
@@ -63,7 +67,7 @@ export class Environment {
     addressSuite: Record<string, string>;
     dependencies: DependencyConfigLoaded[];
   }>;
-  private _factories = new Map<string, ContractFactory>();
+  private _factories = new Map<string, Promise<ContractFactory>>();
   private _parsedConfigs = new Map<
     ConfigOrConstructor,
     ContractConfigurationWithId
@@ -150,21 +154,27 @@ export class Environment {
 
     if (!newConfig) {
       const config =
-        typeof configOrConstructor === 'function'
+        typeof configOrConstructor === 'function' &&
+        !('getContract' in configOrConstructor)
           ? await configOrConstructor(options, addressSuite)
           : configOrConstructor;
 
-      const id =
+      const contract =
         typeof config === 'string'
-          ? camel(config)
-          : config.id ?? camel(config.name);
+          ? config
+          : typeof config === 'function'
+          ? config
+          : config.contract;
+      const id =
+        typeof contract === 'string' ? camel(contract) : camel(contract.name);
 
       if (addressSuite[id]) {
         throw new Error('duplicate id ' + id);
       }
 
       newConfig = {
-        ...(typeof config === 'string' ? {name: config} : config),
+        ...(typeof config === 'object' ? config : {}),
+        contract,
         id,
       };
 
@@ -177,20 +187,33 @@ export class Environment {
   }
 
   private async _factory<T extends ContractFactory = ContractFactory>(
-    name: string
+    contractOrName: string | ContractFactoryType
   ): Promise<T> {
-    let factory = this._factories.get(name);
+    const name =
+      typeof contractOrName === 'string' ? contractOrName : contractOrName.name;
+
+    const factory = this._factories.get(name);
     if (factory) {
-      return factory as T;
+      return factory as Promise<T>;
     }
 
-    factory = await this.hre.ethers.getContractFactory(name);
-    this._factories.set(name, factory);
-    return factory as T;
+    return this._factories
+      .set(
+        name,
+        (async () => {
+          if (typeof contractOrName === 'string') {
+            return await this.hre.ethers.getContractFactory(name);
+          } else {
+            const deployer = await this.deployer;
+            return new contractOrName(deployer.signer);
+          }
+        })()
+      )
+      .get(name)! as Promise<T>;
   }
 
   private async _getAddress(config: ContractConfigurationWithId) {
-    const factory = await this._factory(config.name);
+    const factory = await this._factory(config.contract);
     const deployer = await this.deployer;
 
     if ('proxy' in config) {
@@ -345,7 +368,7 @@ export class Environment {
 
       const contract = this._contracts[config.id];
       if (!contract) {
-        console.error('missing contract for', config.name);
+        console.error('missing contract for', config.id);
         this._registerError({
           id: config.id,
           error: new Error('missing contract'),
@@ -354,10 +377,10 @@ export class Environment {
         continue;
       }
 
-      debug('checking', config.name, !!config.requiredRoles);
+      debug('checking', config.id, !!config.requiredRoles);
       if (config.requiredRoles && contract) {
         try {
-          console.log('granting-roles', config.name);
+          console.log('granting-roles', config.id);
           for (const requiredRole of config.requiredRoles) {
             if (typeof requiredRole === 'symbol') {
               await roles.grant(requiredRole, contract.address);
@@ -454,7 +477,7 @@ export class Environment {
       }
 
       if (config.initialize)
-        debug('deployment info', config.name, deploymentInfo[config.id]);
+        debug('deployment info', config.id, deploymentInfo[config.id]);
 
       if (!deploymentInfo[config.id].initialized && config.initialize) {
         try {
@@ -515,7 +538,7 @@ export class Environment {
           console.log('finalizing', config.id);
           await config.finalize.call(await this._createContext(config));
         } catch (e: any) {
-          console.error('finalizing failed for', config.name, ' - ', e.message);
+          console.error('finalizing failed for', config.id, ' - ', e.message);
           debug('stack:', e.stack);
         }
       }
@@ -562,7 +585,7 @@ export class Environment {
     registry: Registry,
     constructorId: string
   ): Promise<FactoryInstance<T>> {
-    const factory: T = await this._factory(config.name);
+    const factory: T = await this._factory(config.id);
     let contract: FactoryInstance<T>;
     let address: string;
     let options: DeployOptions<T> | undefined;
@@ -687,7 +710,7 @@ export class Environment {
     } catch (e: any) {
       console.error(
         'event handler "deployed" failed for',
-        config.name,
+        config.id,
         ' - ',
         e.message
       );
@@ -866,7 +889,7 @@ export class Environment {
           console.log('event configured', config.id);
           await config.configured.call(await this._createContext(config));
         } catch (e: any) {
-          console.error('event "configured" failed for', config.name);
+          console.error('event "configured" failed for', config.id);
           this._registerError({
             id: config.id,
             details: 'configure event failed',
@@ -875,7 +898,7 @@ export class Environment {
         }
       }
     } catch (e: any) {
-      console.error('configure failed for', config.name);
+      console.error('configure failed for', config.id);
       this._registerError({
         id: config.id,
         details: 'configure failed',
@@ -925,7 +948,7 @@ export class Environment {
 
         if (result) this._updateSettings(result);
       } catch (e: any) {
-        console.error('error preparing ' + stage, config.name, e.message);
+        console.error('error preparing ' + stage, config.id, e.message);
         this._registerError({
           id: config.id,
           details: 'prepare settings for ' + stage,

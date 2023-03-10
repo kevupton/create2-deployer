@@ -7,7 +7,7 @@ import {
 } from '../deployer';
 import {DeploymentInfo, Registry} from './registry';
 import {HardhatRuntimeEnvironment} from 'hardhat/types';
-import {FactoryInstance} from '../deployer/types';
+import {ContractFactoryType, FactoryInstance} from '../deployer/types';
 import {PromiseOrValue} from '../../typechain-types/common';
 import {Libraries} from '@nomiclabs/hardhat-ethers/types';
 
@@ -39,7 +39,7 @@ export interface BaseConfiguration<
   T extends ContractFactory = ContractFactory
 > {
   id?: string;
-  name: string;
+  contract: string | ContractFactoryType;
   roles?: Record<string, symbol>;
   requiredRoles?: (symbol | ((account: string) => Promise<void>))[];
 
@@ -115,6 +115,7 @@ export type AddressValues<T extends object> = {
 
 export type ConfigOrConstructor<T extends ContractFactory = ContractFactory> =
   | string
+  | ContractFactoryType
   | ContractConfiguration<T>
   | ((
       options: EnvironmentSettings,

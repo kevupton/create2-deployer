@@ -16,7 +16,12 @@ async function main() {
 
     verifyCommands.push(async () => {
       console.log('verifying', name);
-      return verify({name, address, constructorArguments: args});
+      return verify({
+        name,
+        address,
+        constructorArguments: args,
+        noCompile: true,
+      });
     });
 
     const contract = await deployer.deploy(instance, {args, salt: 0});
