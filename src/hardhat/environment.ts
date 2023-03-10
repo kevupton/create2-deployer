@@ -192,24 +192,22 @@ export class Environment {
     const name =
       typeof contractOrName === 'string' ? contractOrName : contractOrName.name;
 
-    const factory = this._factories.get(name);
+    let factory = this._factories.get(name);
     if (factory) {
       return factory as Promise<T>;
     }
 
-    return this._factories
-      .set(
-        name,
-        (async () => {
-          if (typeof contractOrName === 'string') {
-            return await this.hre.ethers.getContractFactory(name);
-          } else {
-            const deployer = await this.deployer;
-            return new contractOrName(deployer.signer);
-          }
-        })()
-      )
-      .get(name)! as Promise<T>;
+    factory = (async () => {
+      if (typeof contractOrName === 'string') {
+        return await this.hre.ethers.getContractFactory(name);
+      } else {
+        const deployer = await this.deployer;
+        return new contractOrName(deployer.signer);
+      }
+    })();
+
+    this._factories.set(name, factory);
+    return factory as Promise<T>;
   }
 
   private async _getAddress(config: ContractConfigurationWithId) {
@@ -585,7 +583,7 @@ export class Environment {
     registry: Registry,
     constructorId: string
   ): Promise<FactoryInstance<T>> {
-    const factory: T = await this._factory(config.id);
+    const factory: T = await this._factory(config.contract);
     let contract: FactoryInstance<T>;
     let address: string;
     let options: DeployOptions<T> | undefined;
