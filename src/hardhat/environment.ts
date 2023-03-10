@@ -165,8 +165,14 @@ export class Environment {
           : typeof config === 'function'
           ? config
           : config.contract;
+
+      const defaultId =
+        typeof contract === 'string'
+          ? camel(contract)
+          : camel(contract.name.replace('__factory', ''));
+
       const id =
-        typeof contract === 'string' ? camel(contract) : camel(contract.name);
+        typeof config === 'object' ? config.id ?? defaultId : defaultId;
 
       if (addressSuite[id]) {
         throw new Error('duplicate id ' + id);
@@ -190,7 +196,9 @@ export class Environment {
     contractOrName: string | ContractFactoryType
   ): Promise<T> {
     const name =
-      typeof contractOrName === 'string' ? contractOrName : contractOrName.name;
+      typeof contractOrName === 'string'
+        ? contractOrName
+        : contractOrName.name.replace('__factory', '');
 
     let factory = this._factories.get(name);
     if (factory) {
