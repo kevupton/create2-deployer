@@ -1,4 +1,4 @@
-import {ContractFactory} from 'ethers';
+import {BytesLike, ContractFactory, Signer} from 'ethers';
 import {
   Deployer,
   DeployOptions,
@@ -87,14 +87,14 @@ export interface ProxyConfiguration<T extends ContractFactory = ContractFactory>
   proxy:
     | ({
         type: 'TransparentUpgradeableProxy';
-        owner?: string;
-        proxyAdmin?: string;
+        owner?: string | Signer;
+        proxyAdmin?: BytesLike; // TODO allow a contract to be put into here
         initialize?: FunctionCallOptions<FactoryInstance<T>>;
         upgrade?: FunctionCallOptions<FactoryInstance<T>>;
       } & DeployTemplateOptions)
     | ({
         type: 'UpgradeableBeacon';
-        owner?: string;
+        owner?: string | Signer;
         initialize?: FunctionCallOptions<FactoryInstance<T>>;
         upgrade?: FunctionCallOptions<FactoryInstance<T>>;
       } & DeployTemplateOptions);
