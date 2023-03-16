@@ -28,6 +28,8 @@ import {
   Deployer,
   DeployOptions,
   deployTransparentUpgradeableProxy,
+  deployUpgradeableBeaconProxy,
+  getSafeSigner,
   getTemplateAddress,
 } from '../deployer';
 import {
@@ -40,15 +42,9 @@ import {
 } from 'ethers/lib/utils';
 import Safe from '@safe-global/safe-core-sdk';
 import EthersAdapter from '@safe-global/safe-ethers-lib';
-import {
-  ProxyAdmin__factory,
-  TransparentUpgradeableProxy__factory,
-  UpgradeableBeacon__factory,
-} from '../proxy';
+import {ProxyAdmin__factory, UpgradeableBeacon__factory} from '../proxy';
 import {getAdminAddress} from '@openzeppelin/upgrades-core';
 import {ContractFactoryType, FactoryInstance} from '../deployer/types';
-import {getSafeSigner} from '../deployer/helpers/get-safe-signer';
-import {deployUpgradeableBeaconProxy} from '../deployer/helpers/deploy-upgradeable-beacon';
 
 export interface ErrorDetails {
   id?: string;

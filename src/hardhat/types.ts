@@ -88,7 +88,7 @@ export interface ProxyConfiguration<T extends ContractFactory = ContractFactory>
     | ({
         type: 'TransparentUpgradeableProxy';
         owner?: string | Signer;
-        proxyAdmin?: BytesLike; // TODO allow a contract to be put into here
+        proxyAdmin?: BytesLike;
         initialize?: FunctionCallOptions<FactoryInstance<T>>;
         upgrade?: FunctionCallOptions<FactoryInstance<T>>;
       } & DeployTemplateOptions)
