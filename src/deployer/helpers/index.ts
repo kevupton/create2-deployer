@@ -7,3 +7,4 @@ export * from './get-template-address';
 export * from './encode-function-call';
 export * from './get-safe-signer';
 export * from './get-overrides';
+export * from './get-fireblocks-signer';

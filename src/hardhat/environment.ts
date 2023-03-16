@@ -33,6 +33,8 @@ import {
 import {
   hexConcat,
   hexDataLength,
+  hexlify,
+  isBytesLike,
   keccak256,
   toUtf8Bytes,
 } from 'ethers/lib/utils';
@@ -628,22 +630,26 @@ export class Environment {
       debug('deployment is a proxy');
       let signer: Signer | undefined;
       if (config.proxy.type === 'TransparentUpgradeableProxy') {
-        let proxyAdmin = await this._getProxyAdmin(address);
+        let proxyAdmin = await this._getProxyAdmin(address, deployer);
 
         try {
           if (proxyAdmin) {
-            const owner = await proxyAdmin.owner();
-            const code = await proxyAdmin.provider.getCode(owner);
+            const proxyAdminOwner = await proxyAdmin.owner();
+            const code = await proxyAdmin.provider.getCode(proxyAdminOwner);
 
-            // if there is a bytecode lets assume it is a proxy admin
-            if (hexDataLength(code) > 0) {
-              signer = await getSafeSigner(owner, proxyAdmin.signer);
+            // if there is a bytecode lets assume it is a gnosis safe signer
+            if (config.proxy.owner instanceof Signer) {
+              signer = config.proxy.owner;
+            } else if (hexDataLength(code) > 0) {
+              signer = await getSafeSigner(proxyAdminOwner, proxyAdmin.signer);
             } else if (
-              !BigNumber.from(owner).eq(await proxyAdmin.signer.getAddress())
+              !BigNumber.from(proxyAdminOwner).eq(deployer.signer.address)
             ) {
-              proxyAdmin = proxyAdmin.connect(
-                await this.hre.ethers.getSigner(owner)
-              );
+              signer = await this.hre.ethers.getSigner(proxyAdminOwner);
+            }
+
+            if (signer) {
+              proxyAdmin = proxyAdmin.connect(signer);
             }
           }
         } catch (e: any) {
@@ -656,6 +662,16 @@ export class Environment {
           debug('stack:', e.stack);
         }
 
+        if (
+          isBytesLike(config.proxy.proxyAdmin) &&
+          hexDataLength(config.proxy.proxyAdmin) === 20
+        ) {
+          proxyAdmin = ProxyAdmin__factory.connect(
+            hexlify(config.proxy.proxyAdmin),
+            deployer.signer
+          );
+        }
+
         contract = await deployTransparentUpgradeableProxy(deployer, {
           id: config.proxy.id || config.id,
           salt: config.proxy.salt,
@@ -665,7 +681,7 @@ export class Environment {
           initialize: config.proxy.initialize,
           upgrade: config.proxy.upgrade,
           proxyAdmin: proxyAdmin ?? {
-            id: config.proxy.proxyAdmin,
+            id: config.proxy.proxyAdmin as string,
             salt: config.proxy.salt,
           },
         });
@@ -697,7 +713,10 @@ export class Environment {
         contract = await deployUpgradeableBeaconProxy(deployer, {
           implementation: contract,
           signer,
-          owner: config.proxy.owner || deployer.signer.address,
+          owner: await this.getAddress(
+            config.proxy.owner,
+            deployer.signer.address
+          ),
           id: config.proxy.id || config.id,
           salt: config.proxy.salt,
         }); // TODO to fix this because it is expecting to return the contract but should get upgradeable beacon
@@ -727,6 +746,14 @@ export class Environment {
     return contract;
   }
 
+  async getAddress(...owners: (string | ethers.Signer | undefined)[]) {
+    for (const owner of owners) {
+      if (typeof owner === 'string') return owner;
+      if (owner) return await owner.getAddress();
+    }
+    throw new Error('Failed to get address');
+  }
+
   private _getProxyAddress<T extends ContractFactory>(
     deployer: Deployer,
     config: ProxyConfiguration<T> & {id: string}
@@ -749,10 +776,12 @@ export class Environment {
   private async _transferOwnership(
     deployer: Deployer,
     address: string,
-    newOwner: string
+    newOwner: string | Signer
   ) {
+    newOwner = await this.getAddress(newOwner);
+
     let contract = UpgradeableBeacon__factory.connect(
-      (await this._getProxyAdmin(address))?.address || address,
+      (await this._getProxyAdmin(address, deployer))?.address || address,
       deployer.signer
     );
 
@@ -813,7 +842,7 @@ export class Environment {
     }
   }
 
-  private async _getProxyAdmin(address: string) {
+  private async _getProxyAdmin(address: string, deployer: Deployer) {
     try {
       const adminAddress = await getAdminAddress(
         this.hre.ethers.provider,
@@ -821,10 +850,7 @@ export class Environment {
       );
 
       if (!BigNumber.from(adminAddress).eq(0)) {
-        return ProxyAdmin__factory.connect(
-          adminAddress,
-          (await this.deployer).signer
-        );
+        return ProxyAdmin__factory.connect(adminAddress, deployer.signer);
       }
     } catch (e) {
       // do nothing
