@@ -2,10 +2,11 @@
 
 ## Deployed Locations
 
-| Network | Deployment                                                                                                                    |
-|---------|-------------------------------------------------------------------------------------------------------------------------------|
-| Rinkeby | [0x07C25C3fcFb51B24Cf325769Ea2E381A309930E2](https://rinkeby.etherscan.io/address/0x07C25C3fcFb51B24Cf325769Ea2E381A309930E2) |
-| Goerli  | [0x07C25C3fcFb51B24Cf325769Ea2E381A309930E2](https://goerli.etherscan.io/address/0x07C25C3fcFb51B24Cf325769Ea2E381A309930E2)  |
+| Network | Deployment                                                                                                                                           |
+|---------|------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Goerli  | [0xceEdACe70F46091986CA09Ac834362b74bC211F4](https://goerli.etherscan.io/address/0xceEdACe70F46091986CA09Ac834362b74bC211F4)                         |
+| Mainnet | [0xceEdACe70F46091986CA09Ac834362b74bC211F4](https://etherscan.io/address/0xceEdACe70F46091986CA09Ac834362b74bC211F4)                                |
+| Polygon | [0xceEdACe70F46091986CA09Ac834362b74bC211F4](https://polygonscan.com/address/0xceEdACe70F46091986CA09Ac834362b74bC211F4)                                                    |
 
 ## Installation
 
