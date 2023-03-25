@@ -19,7 +19,7 @@ import {
 } from './types';
 import {camel} from 'case';
 import {Registry} from './registry';
-import {debug, wait} from '../utils';
+import {debug, gasReporter, wait} from '../utils';
 import {RoleManager} from './role-manager';
 import {HardhatRuntimeEnvironment} from 'hardhat/types';
 import {glob} from 'glob';
@@ -77,6 +77,10 @@ export class Environment {
   constructor(public readonly hre: HardhatRuntimeEnvironment) {
     this._ready = this._prepareConfigurations();
     this._settings = this.hre.config.environment.settings;
+  }
+
+  get gasReporter() {
+    return gasReporter;
   }
 
   get settings() {
