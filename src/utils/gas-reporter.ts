@@ -46,6 +46,7 @@ export class GasReporter {
     reporter.#usage = this.#usage;
     reporter.#totalCost = this.#totalCost;
     reporter.#avgPrice = this.#avgPrice;
+    return reporter;
   }
 
   toJSON(gasPrice = this.#avgPrice) {
