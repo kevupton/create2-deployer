@@ -37,6 +37,8 @@ export const deployTransparentUpgradeableProxy = async <T extends Contract>(
 
   // deploy the proxy, or retrieve the proxy instance if it is already deployed.
   debug('deploying proxy');
+  debug('proxy admin address', proxyAdmin.address);
+  debug('implementation address', implementation.address);
   const proxy = await deployTemplate(deployer, 'TransparentUpgradeableProxy', {
     logic: implementation.address,
     admin: proxyAdmin.address,

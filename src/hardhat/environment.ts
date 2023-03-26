@@ -681,7 +681,7 @@ export class Environment {
           initialize: config.proxy.initialize,
           upgrade: config.proxy.upgrade,
           proxyAdmin: proxyAdmin ?? {
-            id: config.proxy.proxyAdmin as string,
+            id: config.proxy.proxyAdmin as string | undefined,
             salt: config.proxy.salt,
           },
         });
