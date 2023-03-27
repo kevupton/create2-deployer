@@ -128,7 +128,11 @@ export class Deployer {
         await Deployer.formatCalls(calls, contractAddress),
         getOverrides(overrides, this.provider)
       );
-      contract._deployedPromise = wait(tx).then(() => contract);
+      contract._deployedPromise = wait(tx, {
+        name: 'Deploy(' + factory.constructor.name + ')',
+        action: 'deploy',
+        address: contractAddress,
+      }).then(() => contract);
       Object.defineProperty(contract, 'deployTransaction', {
         writable: false,
         value: tx,
@@ -163,7 +167,11 @@ export class Deployer {
       );
       return {
         address: contractAddress,
-        deployed: wait(tx).then(() => contractAddress),
+        deployed: wait(tx, {
+          name: 'Clone(' + target + ')',
+          address: contractAddress,
+          action: 'clone',
+        }).then(() => contractAddress),
         deployTransaction: tx,
       };
     }
@@ -189,7 +197,11 @@ export class Deployer {
         await Deployer.formatCalls(calls, contractAddress),
         getOverrides(overrides, this.provider)
       );
-      contract._deployedPromise = wait(tx).then(() => contract);
+      contract._deployedPromise = wait(tx, {
+        name: 'Artifact(' + artifact.contractName + ')',
+        action: 'deploy',
+        address: contractAddress,
+      }).then(() => contract);
       Object.defineProperty(contract, 'deployTransaction', {
         writable: false,
         value: tx,
@@ -249,7 +261,12 @@ export class Deployer {
         debug('template deployed ' + tx.hash);
         return tx;
       })
-      .then(wait);
+      .then(
+        wait.withContext({
+          name: 'Template: ' + templateId,
+          action: 'deployTemplate',
+        })
+      );
   }
 
   async deployTemplateFromFactory<T extends ContractFactory>(
@@ -284,7 +301,11 @@ export class Deployer {
         await Deployer.formatCalls(calls, contractAddress),
         getOverrides(overrides, this.provider)
       );
-      contract._deployedPromise = wait(tx).then(() => contract);
+      contract._deployedPromise = wait(tx, {
+        name: 'Template(' + templateId + ')',
+        action: 'deploy',
+        address: contractAddress,
+      }).then(() => contract);
       Object.defineProperty(contract, 'deployTransaction', {
         writable: false,
         value: tx,
@@ -313,7 +334,12 @@ export class Deployer {
           debug('hash: ' + tx.hash);
           return tx;
         })
-        .then(wait);
+        .then(
+          wait.withContext({
+            name: factory.constructor.name,
+            action: 'createTemplate',
+          })
+        );
     }
 
     return templateId;

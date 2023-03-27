@@ -565,6 +565,7 @@ export class Environment {
       if ('proxy' in config && config.proxy.owner) {
         console.log('transferring ownership', config.id);
         await this._transferOwnership(
+          config.id,
           deployer,
           contract.address,
           config.proxy.owner
@@ -774,6 +775,7 @@ export class Environment {
   }
 
   private async _transferOwnership(
+    id: string,
     deployer: Deployer,
     address: string,
     newOwner: string | Signer
@@ -827,7 +829,13 @@ export class Environment {
           contract = contract.connect(await this.hre.ethers.getSigner(owner));
         }
 
-        await contract.transferOwnership(newOwner).then(wait);
+        await contract.transferOwnership(newOwner).then(
+          wait.withContext({
+            name: id,
+            address,
+            action: 'transferOwnership',
+          })
+        );
       }
     } catch (e: any) {
       console.error(

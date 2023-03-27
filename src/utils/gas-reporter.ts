@@ -1,11 +1,23 @@
 import {TransactionReceipt} from '@ethersproject/providers';
 import {BigNumber} from 'ethers';
+import 'console.table';
+
+export interface GasReportContext extends Partial<Record<string, string>> {
+  name: string;
+  action: string;
+  address?: string;
+}
+
+export interface LogItem {
+  receipt: TransactionReceipt;
+  context?: GasReportContext;
+}
 
 export class GasReporter {
   #usage = BigNumber.from(0);
   #avgPrice = BigNumber.from(0);
   #totalCost = BigNumber.from(0);
-  #log: TransactionReceipt[] = [];
+  #log: LogItem[] = [];
 
   get usage() {
     return this.#usage;
@@ -30,14 +42,29 @@ export class GasReporter {
     this.#log = [];
   }
 
-  report(receipt: TransactionReceipt) {
+  report(receipt: TransactionReceipt, context?: GasReportContext) {
     const cost = receipt.effectiveGasPrice.mul(receipt.gasUsed);
 
     this.#usage = this.#usage.add(receipt.gasUsed);
     this.#totalCost = this.#totalCost.add(cost);
     this.#avgPrice = this.#totalCost.div(this.#usage);
+    this.#log.push({
+      receipt,
+      context,
+    });
 
-    this.onReceive(receipt);
+    this.onReceive(receipt, context);
+  }
+
+  showReport() {
+    console.table(
+      this.#log.map(({context, receipt}) => {
+        return {
+          ...context,
+          gasUsage: receipt.gasUsed.toString(),
+        };
+      })
+    );
   }
 
   clone() {
@@ -57,7 +84,8 @@ export class GasReporter {
     };
   }
 
-  onReceive: (tx: TransactionReceipt) => void = () => {};
+  onReceive: (tx: TransactionReceipt, context?: GasReportContext) => void =
+    () => {};
 }
 
 export const gasReporter = new GasReporter();

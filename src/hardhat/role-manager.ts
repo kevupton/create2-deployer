@@ -21,7 +21,13 @@ export class RoleManager {
 
     if (!(await contract.hasRole(roleId, account))) {
       debug('granting role ' + role.description + ' for ' + account);
-      await contract.grantRole(roleId, account).then(wait);
+      await contract.grantRole(roleId, account).then(
+        wait.withContext({
+          name: contract.constructor.name,
+          action: 'grantRole',
+          address: contract.address,
+        })
+      );
     } else {
       debug('role ' + role.description + ' already granted for ' + account);
     }

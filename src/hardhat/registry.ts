@@ -84,7 +84,12 @@ export class Registry {
 
     if (calls.length) {
       try {
-        await this.contract.multicall(calls).then(wait);
+        await this.contract.multicall(calls).then(
+          wait.withContext({
+            name: 'Registry',
+            action: 'multicall/sync',
+          })
+        );
       } catch (e) {
         console.warn('registry multicall failed', e);
       }
@@ -140,7 +145,12 @@ export class Registry {
     debug('registering settings ', id);
 
     try {
-      await registry.registerSettings(bytes).then(wait);
+      await registry.registerSettings(bytes).then(
+        wait.withContext({
+          name: 'Registry',
+          action: 'registerSettings',
+        })
+      );
       console.log('submitted options');
     } catch (e) {
       console.log('options already submitted');
