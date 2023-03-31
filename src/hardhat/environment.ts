@@ -547,7 +547,11 @@ export class Environment {
           await config.finalize.call(await this._createContext(config));
         } catch (e: any) {
           console.error('finalizing failed for', config.id, ' - ', e.message);
-          debug('stack:', e.stack);
+          this._registerError({
+            id: config.id,
+            error: e,
+            details: 'finalize failed',
+          });
         }
       }
     }
