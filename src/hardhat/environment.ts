@@ -355,12 +355,47 @@ export class Environment {
       const contract = this._contracts[config.id];
       if (!contract) {
         debug('missing contract for ' + config.id);
+        continue;
       }
 
       Object.values(config.roles || {}).forEach(role => {
         roles.register(role, contract);
       });
     }
+
+    for (const config of configs) {
+      const target = this._contracts[config.id];
+      if (!target) {
+        debug('missing contract for ' + config.id);
+        this._registerError({
+          id: config.id,
+          error: new Error('missing contract'),
+          details: 'grant roles failed',
+        });
+        continue;
+      }
+      if (!this._canProgress(config.id)) {
+        continue;
+      }
+      config.requiredRoles?.forEach(request => {
+        let contract: Contract;
+        let role: string;
+        if (typeof request === 'symbol') {
+          contract = roles.getContract(request);
+          role = roles.getRoleIdFromSymbol(request);
+        } else {
+          const id = (request.config as DependencyConfigLoaded).config.id;
+          contract = this._contracts[id];
+          if (!contract) {
+            throw new Error('missing contract');
+          }
+          role = request.role;
+        }
+
+        roles.group(contract, role, target.address);
+      });
+    }
+
     return roles;
   }
 
@@ -369,43 +404,13 @@ export class Environment {
 
     debug('granting roles...');
 
-    for (const config of configs) {
-      if (!this._canProgress(config.id)) {
-        continue;
-      }
-
-      const contract = this._contracts[config.id];
-      if (!contract) {
-        console.error('missing contract for', config.id);
-        this._registerError({
-          id: config.id,
-          error: new Error('missing contract'),
-          details: 'grant roles failed',
-        });
-        continue;
-      }
-
-      debug('checking', config.id, !!config.requiredRoles);
-      if (config.requiredRoles && contract) {
-        try {
-          console.log('granting-roles', config.id);
-          for (const requiredRole of config.requiredRoles) {
-            if (typeof requiredRole === 'symbol') {
-              await roles.grant(requiredRole, contract.address);
-            } else {
-              await requiredRole(contract.address);
-            }
-          }
-        } catch (e: any) {
-          // TODO add context to the rolesMapping
-          console.log('failed grant role for', config.id);
-          this._registerError({
-            id: config.id,
-            error: e,
-            details: 'grant roles failed',
-          });
-        }
-      }
+    try {
+      await roles.grantAll();
+    } catch (e) {
+      this._registerError({
+        error: e,
+        details: 'grant all roles failed',
+      });
     }
   }
 

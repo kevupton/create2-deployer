@@ -21,6 +21,11 @@ export type AddressSuite = {
   [key in keyof ContractSuite]: string;
 };
 
+export interface RoleRequest {
+  config: DependencyConfig;
+  role: string;
+}
+
 export interface CallbackContext<T extends ContractFactory = ContractFactory> {
   deployer: Deployer;
   contracts: ContractSuite;
@@ -41,7 +46,7 @@ export interface BaseConfiguration<
   id?: string;
   contract: string | ContractFactoryType;
   roles?: Record<string, symbol>;
-  requiredRoles?: (symbol | ((account: string) => Promise<void>))[];
+  requiredRoles?: (symbol | RoleRequest)[];
 
   deployed?(
     this: Omit<CallbackContext<T>, 'contracts'> & {
