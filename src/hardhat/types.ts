@@ -5,7 +5,6 @@ import {
   DeployTemplateOptions,
   FunctionCallOptions,
 } from '../deployer';
-import {DeploymentInfo, Registry} from './registry';
 import {HardhatRuntimeEnvironment} from 'hardhat/types';
 import {ContractFactoryType, FactoryInstance} from '../deployer/types';
 import {PromiseOrValue} from '../../typechain-types/common';
@@ -29,7 +28,6 @@ export interface RoleRequest {
 export interface CallbackContext<T extends ContractFactory = ContractFactory> {
   deployer: Deployer;
   contracts: ContractSuite;
-  registry: Registry;
   addresses: AddressSuite;
   hre: HardhatRuntimeEnvironment;
   settings: EnvironmentSettings;
@@ -84,11 +82,16 @@ export interface DefaultConfiguration<T extends ContractFactory>
   deployOptions?: DeployOptions<T>;
 }
 
+export interface DeploymentInfo {
+  address: string;
+  deployed: boolean;
+}
+
 export interface ProxyConfiguration<T extends ContractFactory = ContractFactory>
   extends BaseConfiguration<T> {
   deployOptions?:
     | DeployOptions<T>
-    | ((options: DeploymentInfo) => PromiseOrValue<DeployOptions<T>>);
+    | ((info: DeploymentInfo) => PromiseOrValue<DeployOptions<T>>);
   proxy:
     | ({
         type: 'TransparentUpgradeableProxy';

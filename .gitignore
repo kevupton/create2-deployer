@@ -13,3 +13,5 @@ artifacts
 package
 hardhat.config.js
 .idea
+
+contracts.json

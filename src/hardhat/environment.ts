@@ -18,7 +18,6 @@ import {
   ProxyConfiguration,
 } from './types';
 import {camel} from 'case';
-import {Registry} from './registry';
 import {debug, gasReporter, wait} from '../utils';
 import {RoleManager} from './role-manager';
 import {HardhatRuntimeEnvironment} from 'hardhat/types';
@@ -99,44 +98,30 @@ export class Environment {
     return this._ready.then(val => val.dependencies);
   }
 
-  get registry() {
-    return Registry.from(this.deployer);
-  }
-
   reload() {
     this._parsedConfigs.clear();
     this._factories.clear();
     this._ready = this._prepareConfigurations();
   }
 
-  async getDeploymentInfo<T extends Record<string, string>>(contracts: T) {
-    const registry = await Registry.from(this.deployer);
-    return registry.deploymentInfo(contracts);
-  }
-
   async upgrade() {
-    const [registry, addresses] = await Promise.all([
-      Registry.from(this.deployer),
-      this.addresses,
-    ]);
+    const addresses = await this.addresses;
 
     debug('address suite', addresses);
     this._contracts = {};
     this._errors = [];
 
     let configs = await this._sortConfigurations('deploy');
-    await this._deployConfigurations(configs, registry);
+    await this._deployConfigurations(configs);
     await this._grantRoles(configs);
 
     configs = await this._sortConfigurations('initialize');
     await this._prepareSettings(configs, 'initialize');
-    await this._initialize(configs, registry);
+    await this._initialize(configs);
 
     configs = await this._sortConfigurations('configure');
     await this._prepareSettings(configs, 'configure');
-    await this._configure(configs, registry);
-
-    await registry.sync();
+    await this._configure(configs);
 
     configs = await this._sortConfigurations('finalize');
     await this._prepareSettings(configs, 'finalize');
@@ -434,23 +419,16 @@ export class Environment {
     };
   }
 
-  private async _deployConfigurations(
-    configs: ContractConfigurationWithId[],
-    registry: Registry
-  ) {
+  private async _deployConfigurations(configs: ContractConfigurationWithId[]) {
     const [deployer] = await Promise.all([this.deployer]);
 
     debug('deploying...');
-
-    const constructorId = await registry.registerSettings(
-      this.hre.config.environment.settings
-    );
 
     for (const config of configs) {
       console.log('deploying', config.id);
 
       try {
-        await this._deployContract(config, deployer, registry, constructorId);
+        await this._deployContract(config, deployer);
       } catch (e: any) {
         console.error('failed to deploy', config.id);
         this._registerError({
@@ -463,18 +441,8 @@ export class Environment {
     }
   }
 
-  private async _initialize(
-    configs: ContractConfigurationWithId[],
-    registry: Registry
-  ) {
-    const [addresses] = await Promise.all([this.addresses]);
-
+  private async _initialize(configs: ContractConfigurationWithId[]) {
     debug('initializing...');
-
-    const deploymentInfo = await registry.deploymentInfo(addresses);
-    const constructorId = await registry.registerSettings(
-      this.hre.config.environment.settings
-    );
 
     for (const config of configs) {
       const contract = this._contracts[config.id];
@@ -489,15 +457,10 @@ export class Environment {
         continue;
       }
 
-      if (config.initialize)
-        debug('deployment info', config.id, deploymentInfo[config.id]);
-
-      if (!deploymentInfo[config.id].initialized && config.initialize) {
+      if (!contract.deployTransaction && config.initialize) {
         try {
           console.log('initializing', config.id);
           await config.initialize.call(await this._createContext(config));
-
-          registry.setInitialized(contract.address, constructorId);
 
           if (config.initialized) {
             try {
@@ -525,18 +488,11 @@ export class Environment {
     }
   }
 
-  private async _configure(
-    configs: ContractConfigurationWithId[],
-    registry: Registry
-  ) {
+  private async _configure(configs: ContractConfigurationWithId[]) {
     debug('configuring...');
 
-    const configureId = await registry.registerSettings(
-      this.hre.config.environment.settings
-    );
-
     for (const config of configs) {
-      await this._configureContract(config, configureId, registry);
+      await this._configureContract(config);
     }
   }
 
@@ -599,9 +555,7 @@ export class Environment {
 
   private async _deployContract<T extends ContractFactory>(
     config: ContractConfigurationWithId<T>,
-    deployer: Deployer,
-    registry: Registry,
-    constructorId: string
+    deployer: Deployer
   ): Promise<FactoryInstance<T>> {
     const factory: T = await this._factory(config.contract);
     let contract: FactoryInstance<T>;
@@ -611,10 +565,11 @@ export class Environment {
     if ('proxy' in config) {
       if (typeof config.deployOptions === 'function') {
         address = this._getProxyAddress(deployer, config);
-        const {address: deploymentInfo} = await this.getDeploymentInfo({
+        const code = await deployer.provider.getCode(address);
+        options = await config.deployOptions.call(this._createContext(config), {
           address,
+          deployed: hexDataLength(code) > 0,
         });
-        options = await config.deployOptions(deploymentInfo);
       } else {
         // to keep typescript happy
         options = config.deployOptions;
@@ -634,7 +589,6 @@ export class Environment {
     address = contract.address;
 
     await contract.deployed();
-    await registry.setDeploymentInfo(contract, constructorId);
 
     if ('proxy' in config) {
       debug('deployment is a proxy');
@@ -733,8 +687,6 @@ export class Environment {
       } else {
         throw new Error('invalid proxy type "' + config.proxy['type'] + '"');
       }
-
-      await registry.setDeploymentInfo(contract, constructorId);
     }
 
     this._contracts[config.id] = contract;
@@ -878,10 +830,9 @@ export class Environment {
   private async _createContext<T extends ContractFactory = ContractFactory>(
     config: ContractConfigurationWithId<T>
   ): Promise<CallbackContext<T>> {
-    const [deployer, addresses, registry] = await Promise.all([
+    const [deployer, addresses] = await Promise.all([
       this.deployer,
       this.addresses,
-      Registry.from(this.deployer),
     ]);
 
     return {
@@ -889,35 +840,21 @@ export class Environment {
       contracts: this._contracts,
       deployer,
       addresses,
-      registry,
       config,
       settings: this._settings,
       configure: async () => {
-        const configureId = await registry.registerSettings(
-          this.hre.config.environment.settings
-        );
-        await this._configureContract(config, configureId, registry);
+        debug('configuring', config.id);
+        await this._configureContract(config);
       },
       deploy: async (): Promise<FactoryInstance<T>> => {
-        const constructorId = await registry.registerSettings(
-          this.hre.config.environment.settings
-        );
-
-        console.log('deploying', config.id);
-        return await this._deployContract(
-          config,
-          deployer,
-          registry,
-          constructorId
-        );
+        debug('deploying', config.id);
+        return await this._deployContract(config, deployer);
       },
     };
   }
 
   private async _configureContract<T extends ContractFactory = ContractFactory>(
-    config: ContractConfigurationWithId<T>,
-    configureId: string,
-    registry: Registry
+    config: ContractConfigurationWithId<T>
   ) {
     const contract = this._contracts[config.id];
 
@@ -932,7 +869,6 @@ export class Environment {
     try {
       console.log('configuring', config.id);
       await config.configure.call(await this._createContext(config));
-      registry.setConfigured(contract.address, configureId);
       if (config.configured) {
         try {
           console.log('event configured', config.id);
@@ -1042,6 +978,12 @@ export class Environment {
       console.error(error);
       throw error.error;
     }
+
+    const message = (error as any)?.message || error?.toString() || `${error}`;
+    const errorString = `${error.id ? `[${error.id}] ` : ''}${
+      error.details
+    }. ${message}`;
+    debug(errorString);
 
     this._errors.push(error);
   }
