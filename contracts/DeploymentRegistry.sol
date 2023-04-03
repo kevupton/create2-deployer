@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/utils/Multicall.sol";
 
 contract DeploymentRegistry is Multicall {
 
-    event SettingsRegistered(bytes32 indexed id);
+    event SettingsRegistered(bytes32 indexed id, bytes settings);
     event Registered(address indexed target, DeploymentInfo info, address indexed sender);
     event Initialized(address indexed target, bytes32 settings);
     event Configured(address indexed target, bytes32 settings);
@@ -23,7 +23,6 @@ contract DeploymentRegistry is Multicall {
         bytes32 initializeSettings;
     }
 
-    mapping(bytes32 => bytes) public settings;
     mapping(address => DeploymentInfo) public deploymentInfo;
 
     modifier onlyOwner(address target) {
@@ -51,7 +50,6 @@ contract DeploymentRegistry is Multicall {
     function registerSettings(bytes calldata currentSettings) external returns (bytes32 id) {
         id = keccak256(currentSettings);
         require(settings[id].length == 0, 'DeploymentRegistry: SETTINGS_EXIST');
-        settings[id] = currentSettings;
         emit SettingsRegistered(id);
     }
 
