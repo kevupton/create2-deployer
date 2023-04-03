@@ -20,7 +20,7 @@ import {Artifact} from 'hardhat/types';
 import {SignerWithAddress} from '@nomiclabs/hardhat-ethers/signers';
 import {Create2Deployer} from '../../typechain-types/contracts/Create2Deployer';
 import {JsonRpcSigner} from '@ethersproject/providers';
-import {Create2Deployer__factory} from '../../typechain-types';
+import {Create2Deployer__factory} from '../../typechain-types/factories/contracts/Create2Deployer__factory';
 import {PromiseOrValue} from '../../typechain-types/common';
 import {CREATE2_DEPLOYER_ADDRESS} from './constants';
 import {InstanceFactory, FactoryInstance} from './types';
