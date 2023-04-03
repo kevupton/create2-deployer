@@ -8,7 +8,6 @@ import {getAddress, hexConcat, keccak256} from 'ethers/lib/utils';
 import * as fs from 'fs';
 import {
   Create2Deployer__factory,
-  DeploymentRegistry__factory,
   Placeholder__factory,
 } from '../../typechain-types';
 import {CREATE2_DEPLOYER_ADDRESS, Deployer} from '../deployer';
@@ -126,12 +125,6 @@ task(TASK_TEST_SETUP_TEST_ENVIRONMENT).setAction(
     ]);
 
     const deployer = new Deployer(signer);
-
-    const deploymentRegistry = await deployer.deploy(
-      new DeploymentRegistry__factory(),
-      {salt: 0}
-    );
-    await deploymentRegistry.deployed();
 
     const placeholder = await deployer.deploy(new Placeholder__factory(), {
       salt: 0,
