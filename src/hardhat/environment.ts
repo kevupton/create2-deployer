@@ -457,7 +457,7 @@ export class Environment {
         continue;
       }
 
-      if (!contract.deployTransaction && config.initialize) {
+      if (contract.deployTransaction && config.initialize) {
         try {
           console.log('initializing', config.id);
           await config.initialize.call(await this._createContext(config));
