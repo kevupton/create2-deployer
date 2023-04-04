@@ -1,6 +1,6 @@
 {
   "name": "create2-deployer",
-  "version": "1.0.0-beta.94",
+  "version": "1.0.0-beta.95",
   "main": "index.js",
   "repository": "https://github.com/SOMA-Finance/create2-deployer.git",
   "author": "Kevin Upton <kevin@soma.finance>",
@@ -57,7 +57,7 @@
     "fireblocks-sdk": "^4.0.0",
     "glob": "^8.0.3",
     "hardhat-dependency-compiler": "^1.1.3",
-    "hardhat-package": "^1.0.0-beta.11"
+    "hardhat-package": "^1.0.0-beta.14"
   },
   "engines": {
     "node": ">=14.0.0"
