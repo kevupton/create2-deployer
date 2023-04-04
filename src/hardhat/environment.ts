@@ -1,6 +1,7 @@
 import {
   BigNumber,
   BigNumberish,
+  BytesLike,
   Contract,
   ContractFactory,
   ethers,
@@ -36,14 +37,19 @@ import {
   hexDataLength,
   hexlify,
   isBytesLike,
+  isHexString,
   keccak256,
   toUtf8Bytes,
 } from 'ethers/lib/utils';
 import Safe from '@safe-global/safe-core-sdk';
 import EthersAdapter from '@safe-global/safe-ethers-lib';
 import {ProxyAdmin__factory, UpgradeableBeacon__factory} from '../proxy';
-import {getAdminAddress} from '@openzeppelin/upgrades-core';
+import {
+  getAdminAddress,
+  getImplementationAddress,
+} from '@openzeppelin/upgrades-core';
 import {ContractFactoryType, FactoryInstance} from '../deployer/types';
+import {verify, VerifyOptions} from './verify';
 
 export interface ErrorDetails {
   id?: string;
@@ -102,6 +108,53 @@ export class Environment {
     this._parsedConfigs.clear();
     this._factories.clear();
     this._ready = this._prepareConfigurations();
+  }
+
+  async verify(maxAsync = 3) {
+    const addresses = await this.addresses;
+    const configs = await this._sortConfigurations();
+
+    let verifyCommands: Promise<any>[] = [];
+
+    for (const config of configs) {
+      const address = addresses[config.id];
+
+      if (!address) {
+        continue;
+      }
+
+      const verifyOptions: VerifyOptions = {address, noCompile: true};
+
+      if ('proxy' in config) {
+        console.log('verifying ' + config.id + ' proxy at ' + address);
+        const implementation = await getImplementationAddress(
+          this.hre.ethers.provider,
+          address
+        );
+
+        const options = await (typeof config.deployOptions === 'function'
+          ? config.deployOptions({
+              address,
+              deployed: true,
+            })
+          : config.deployOptions);
+
+        verifyOptions.constructorArguments = options?.args;
+        verifyOptions.address = implementation;
+      } else {
+        console.log('verifying ' + config.id + ' at ' + address);
+        verifyOptions.constructorArguments = config.deployOptions?.args;
+      }
+
+      verifyCommands.push(verify(this.hre, verifyOptions));
+
+      if (verifyCommands.length >= maxAsync) {
+        await Promise.all(verifyCommands);
+        verifyCommands = [];
+      }
+    }
+
+    await Promise.all(verifyCommands);
   }
 
   async upgrade() {
@@ -334,17 +387,38 @@ export class Environment {
     return sortedDeps;
   }
 
-  private _createRoleManager(configs: ContractConfigurationWithId[]) {
+  private async _createRoleManager(configs: ContractConfigurationWithId[]) {
     const roles = new RoleManager();
     for (const config of configs) {
-      const contract = this._contracts[config.id];
+      let contract = this._contracts[config.id];
       if (!contract) {
         debug('missing contract for ' + config.id);
         continue;
       }
 
+      if (!config.roles && !config.roleAdmin) {
+        continue;
+      }
+
+      let roleAdmin: BytesLike | Signer | undefined;
+      if (typeof config.roleAdmin === 'function') {
+        roleAdmin = await config.roleAdmin(contract);
+      }
+
+      if (isBytesLike(roleAdmin) && hexDataLength(roleAdmin) === 20) {
+        roleAdmin = await this.hre.ethers.getSigner(hexlify(roleAdmin));
+      } else {
+        roleAdmin = undefined;
+      }
+
+      if (roleAdmin) {
+        contract = contract.connect(roleAdmin);
+      }
+
+      roles.registerConfig(config, contract);
+
       Object.values(config.roles || {}).forEach(role => {
-        roles.register(role, contract);
+        roles.registerRole(role, contract);
       });
     }
 
@@ -362,18 +436,17 @@ export class Environment {
       if (!this._canProgress(config.id)) {
         continue;
       }
+
       config.requiredRoles?.forEach(request => {
         let contract: Contract;
         let role: string;
         if (typeof request === 'symbol') {
-          contract = roles.getContract(request);
+          contract = roles.getContractByRole(request);
           role = roles.getRoleIdFromSymbol(request);
         } else {
-          const id = (request.config as DependencyConfigLoaded).config.id;
-          contract = this._contracts[id];
-          if (!contract) {
-            throw new Error('missing contract');
-          }
+          contract = roles.getContractByConfig(
+            request.config.config as ContractConfigurationWithId
+          );
           role = request.role;
         }
 
@@ -428,7 +501,10 @@ export class Environment {
       console.log('deploying', config.id);
 
       try {
-        await this._deployContract(config, deployer);
+        const contract = await this._deployContract(config, deployer);
+        if (!contract.deployTransaction) {
+          debug('already deployed');
+        }
       } catch (e: any) {
         console.error('failed to deploy', config.id);
         this._registerError({
@@ -559,12 +635,15 @@ export class Environment {
   ): Promise<FactoryInstance<T>> {
     const factory: T = await this._factory(config.contract);
     let contract: FactoryInstance<T>;
-    let address: string;
+    let address: string | undefined;
     let options: DeployOptions<T> | undefined;
 
     if ('proxy' in config) {
+      debug('deployment is a proxy');
+
       if (typeof config.deployOptions === 'function') {
         address = this._getProxyAddress(deployer, config);
+        debug('proxy address ' + address);
         const code = await deployer.provider.getCode(address);
         options = await config.deployOptions.call(this._createContext(config), {
           address,
@@ -586,35 +665,55 @@ export class Environment {
         options?.salt
       ),
     });
-    address = contract.address;
+
+    if (!address) {
+      address = contract.address;
+    }
 
     await contract.deployed();
 
     if ('proxy' in config) {
-      debug('deployment is a proxy');
       let signer: Signer | undefined;
       if (config.proxy.type === 'TransparentUpgradeableProxy') {
+        debug('is TransparentUpgradeableProxy');
+
         let proxyAdmin = await this._getProxyAdmin(address, deployer);
 
         try {
           if (proxyAdmin) {
+            debug('detected existing proxy admin');
+
             const proxyAdminOwner = await proxyAdmin.owner();
             const code = await proxyAdmin.provider.getCode(proxyAdminOwner);
+
+            debug('proxy admin owner: ' + proxyAdminOwner);
 
             // if there is a bytecode lets assume it is a gnosis safe signer
             if (config.proxy.owner instanceof Signer) {
               signer = config.proxy.owner;
+              debug(
+                'using custom specified signer to upgrade ' +
+                  (await config.proxy.owner.getAddress())
+              );
             } else if (hexDataLength(code) > 0) {
               signer = await getSafeSigner(proxyAdminOwner, proxyAdmin.signer);
+              debug(
+                'using gnosis safe wallet to upgrade ' +
+                  (await signer.getAddress())
+              );
             } else if (
               !BigNumber.from(proxyAdminOwner).eq(deployer.signer.address)
             ) {
               signer = await this.hre.ethers.getSigner(proxyAdminOwner);
+              debug('using signer specified via owner: ' + proxyAdminOwner);
             }
 
             if (signer) {
               proxyAdmin = proxyAdmin.connect(signer);
+              debug('connected proxy admin to signer');
             }
+          } else {
+            debug('could not detect existing proxy admin');
           }
         } catch (e: any) {
           console.error(
@@ -638,7 +737,11 @@ export class Environment {
 
         contract = await deployTransparentUpgradeableProxy(deployer, {
           id: config.proxy.id || config.id,
-          salt: config.proxy.salt,
+          salt: this._generateSalt(
+            deployer,
+            config.proxy.id || config.id,
+            config.proxy.salt
+          ),
           overrides: config.proxy.overrides,
           implementation: contract,
           signer,
@@ -646,7 +749,11 @@ export class Environment {
           upgrade: config.proxy.upgrade,
           proxyAdmin: proxyAdmin ?? {
             id: config.proxy.proxyAdmin as string | undefined,
-            salt: config.proxy.salt,
+            salt: this._generateSalt(
+              deployer,
+              config.proxy.proxyAdmin?.toString(),
+              config.proxy.salt
+            ),
           },
         });
       } else if (config.proxy.type === 'UpgradeableBeacon') {
@@ -682,7 +789,11 @@ export class Environment {
             deployer.signer.address
           ),
           id: config.proxy.id || config.id,
-          salt: config.proxy.salt,
+          salt: this._generateSalt(
+            deployer,
+            config.proxy.id || config.id,
+            config.proxy.salt
+          ),
         }); // TODO to fix this because it is expecting to return the contract but should get upgradeable beacon
       } else {
         throw new Error('invalid proxy type "' + config.proxy['type'] + '"');
@@ -723,12 +834,20 @@ export class Environment {
     if (config.proxy.type === 'TransparentUpgradeableProxy') {
       return getTemplateAddress(deployer, 'TransparentUpgradeableProxy', {
         id: config.proxy.id || config.id,
-        salt: config.proxy.salt,
+        salt: this._generateSalt(
+          deployer,
+          config.proxy.id || config.id,
+          config.proxy.salt
+        ),
       });
     } else if (config.proxy.type === 'UpgradeableBeacon') {
       return getTemplateAddress(deployer, 'UpgradeableBeacon', {
         id: config.proxy.id || config.id,
-        salt: config.proxy.salt,
+        salt: this._generateSalt(
+          deployer,
+          config.proxy.id || config.id,
+          config.proxy.salt
+        ),
       });
     } else {
       throw new Error('invalid proxy type "' + config.proxy['type'] + '"');
@@ -818,10 +937,13 @@ export class Environment {
         address
       );
 
+      debug(address + ' admin address ' + adminAddress);
+
       if (!BigNumber.from(adminAddress).eq(0)) {
         return ProxyAdmin__factory.connect(adminAddress, deployer.signer);
       }
     } catch (e) {
+      console.log(e);
       // do nothing
     }
     return undefined;
@@ -944,10 +1066,10 @@ export class Environment {
     }
   }
 
-  private _generateSalt(deployer: Deployer, id: string, salt?: BigNumberish) {
+  private _generateSalt(deployer: Deployer, id?: string, salt?: BigNumberish) {
     return keccak256(
       hexConcat([
-        toUtf8Bytes(id),
+        id ? toUtf8Bytes(id) : '0x',
         BigNumber.from(salt || deployer.defaultSalt).toHexString(),
       ])
     );

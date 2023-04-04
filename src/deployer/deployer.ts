@@ -244,12 +244,12 @@ export class Deployer {
     const contractAddress = await this.templateAddress(templateId, {id, salt});
     const code = await this.provider.getCode(contractAddress);
 
-    debug('deploying template ' + templateId);
-
     if (hexDataLength(code)) {
+      debug('already deployed template ' + templateId);
       return;
     }
 
+    debug('deploying template ' + templateId);
     await this.create2Deployer
       .deployTemplate(
         templateId,
@@ -286,15 +286,16 @@ export class Deployer {
       salt,
       args,
     });
-    debug('deploying template ' + templateId);
     const code = await this.provider.getCode(contractAddress);
     const contract = factory
       .connect(this.signer)
       .attach(contractAddress) as FactoryInstance<T>;
 
     if (hexDataLength(code)) {
+      debug('already deployed template ' + templateId);
       contract._deployedPromise = Promise.resolve(contract);
     } else {
+      debug('deploying template ' + templateId);
       const tx = await this.create2Deployer.deployTemplate(
         templateId,
         this.generateSalt(id, salt),

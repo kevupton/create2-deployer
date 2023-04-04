@@ -49,6 +49,8 @@ export const deployTransparentUpgradeableProxy = async <T extends Contract>(
   });
   await proxy.deployed();
 
+  debug('deployed proxy address', proxy.address);
+
   // upgrade the proxy if we need to
   await upgradeTransparentUpgradeableProxy(deployer, {
     proxy,

@@ -1,23 +1,37 @@
-import {Contract} from 'ethers';
+import {Contract, Signer} from 'ethers';
 import {keccak256, toUtf8Bytes} from 'ethers/lib/utils';
 import {debug, wait} from '../utils';
+import {ContractConfigurationWithId} from './types';
 
 export class RoleManager {
   private readonly contracts: Record<symbol, Contract> = {};
+  private readonly configs = new Map<ContractConfigurationWithId, Contract>();
   private readonly groups = new Map<
     Contract,
     [role: string, target: string][]
   >();
 
-  register(role: symbol, contract: Contract) {
+  registerRole(role: symbol, contract: Contract) {
     this.contracts[role] = contract;
   }
 
-  getContract(symbol: symbol) {
+  registerConfig(config: ContractConfigurationWithId, contract: Contract) {
+    this.configs.set(config, contract);
+  }
+
+  getContractByRole(symbol: symbol) {
     if (!this.contracts[symbol]) {
       throw new Error('symbol has not been registered.');
     }
     return this.contracts[symbol];
+  }
+
+  getContractByConfig(config: ContractConfigurationWithId) {
+    const value = this.configs.get(config);
+    if (!value) {
+      throw new Error('config has not been registered.');
+    }
+    return value;
   }
 
   getRoleIdFromSymbol(role: symbol) {

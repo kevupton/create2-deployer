@@ -45,6 +45,10 @@ export interface BaseConfiguration<
   contract: string | ContractFactoryType;
   roles?: Record<string, symbol>;
   requiredRoles?: (symbol | RoleRequest)[];
+  roleAdmin?:
+    | Signer
+    | BytesLike
+    | ((contract: FactoryInstance<T>) => PromiseOrValue<BytesLike | Signer>);
 
   deployed?(
     this: Omit<CallbackContext<T>, 'contracts'> & {
