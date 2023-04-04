@@ -51,13 +51,15 @@ export class RoleManager {
           })
           .filter(Boolean);
 
-        await contract.multicall(calls).then(
-          wait.withContext({
-            name: contract.constructor.name,
-            action: 'multicall-grantRole',
-            address: contract.address,
-          })
-        );
+        if (calls.length > 0) {
+          await contract.multicall(calls).then(
+            wait.withContext({
+              name: contract.constructor.name,
+              action: 'multicall-grantRole',
+              address: contract.address,
+            })
+          );
+        }
       } else {
         for (const index in groupings) {
           const [role, account] = groupings[index];
