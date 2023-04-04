@@ -1,6 +1,6 @@
 import {BytesLike} from 'ethers';
 import {defaultAbiCoder} from 'ethers/lib/utils';
-import {Create2Deployer} from '../../../typechain-types';
+import {Create2Deployer} from '../../../typechain-types/contracts/Create2Deployer';
 import {PLACEHOLDER_ADDRESS} from '../constants';
 
 export function placeholderCall(

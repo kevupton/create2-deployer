@@ -6,10 +6,8 @@ import {
 } from 'hardhat/builtin-tasks/task-names';
 import {getAddress, hexConcat, keccak256} from 'ethers/lib/utils';
 import * as fs from 'fs';
-import {
-  Create2Deployer__factory,
-  Placeholder__factory,
-} from '../../typechain-types';
+import {Create2Deployer__factory} from '../../typechain-types/factories/contracts/Create2Deployer__factory';
+import {Placeholder__factory} from '../../typechain-types/factories/contracts/Placeholder__factory';
 import {CREATE2_DEPLOYER_ADDRESS, Deployer} from '../deployer';
 import {debug} from '../utils';
 
