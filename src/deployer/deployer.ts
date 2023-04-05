@@ -9,9 +9,9 @@ import {
 } from 'ethers';
 import {
   defaultAbiCoder,
+  getCreate2Address,
   hexConcat,
   hexDataLength,
-  hexDataSlice,
   hexZeroPad,
   keccak256,
   toUtf8Bytes,
@@ -23,7 +23,7 @@ import {JsonRpcSigner} from '@ethersproject/providers';
 import {Create2Deployer__factory} from '../../typechain-types/factories/contracts/Create2Deployer__factory';
 import {PromiseOrValue} from '../../typechain-types/common';
 import {CREATE2_DEPLOYER_ADDRESS} from './constants';
-import {InstanceFactory, FactoryInstance} from './types';
+import {FactoryInstance, InstanceFactory} from './types';
 import {debug, wait} from '../utils';
 import {getOverrides} from './helpers';
 
@@ -86,6 +86,89 @@ export class Deployer {
     if (!this.signer) {
       throw new Error('missing provider inside signer');
     }
+  }
+
+  static templateId<T extends ContractFactory = ContractFactory>(
+    factory: T,
+    args?: Head<Parameters<T['deploy']>>
+  ) {
+    return keccak256(Deployer.bytecode(factory, args));
+  }
+
+  static bytecode(factory: ContractFactory, args: unknown[] = []) {
+    const abiEncodedArgs = args
+      ? defaultAbiCoder.encode(
+          factory.interface.deploy.inputs.map(param => param.format('full')),
+          args
+        )
+      : '0x';
+    return hexConcat([factory.bytecode, abiEncodedArgs]);
+  }
+
+  static factoryAddress<T extends ContractFactory>(
+    factory: T,
+    {id, args, salt}: FactoryAddressOptions<T> = {}
+  ): string {
+    return this.deployAddress(this.bytecode(factory, args), {id, salt});
+  }
+
+  static deployAddress(
+    bytecode: BytesLike,
+    {id, salt}: DeployAddressOptions = {}
+  ) {
+    return getCreate2Address(
+      CREATE2_DEPLOYER_ADDRESS,
+      this.generateSalt(id, salt),
+      keccak256(bytecode)
+    );
+  }
+
+  static async from(signer: JsonRpcSigner, defaultSalt?: BigNumberish) {
+    return new Deployer(await SignerWithAddress.create(signer), defaultSalt);
+  }
+
+  static async formatCalls(
+    calls: (Create2Deployer.FunctionCallStruct | PromiseOrValue<BytesLike>)[],
+    defaultTarget: string
+  ): Promise<Create2Deployer.FunctionCallStruct[]> {
+    return Promise.all(
+      calls.map(async (call): Promise<Create2Deployer.FunctionCallStruct> => {
+        call = await call;
+        if (typeof call === 'string' || 'length' in call) {
+          return {
+            target: defaultTarget,
+            data: call,
+          };
+        } else {
+          return call;
+        }
+      })
+    );
+  }
+
+  static generateSalt(id?: string, salt: BigNumberish = BigNumber.from(0)) {
+    salt = BigNumber.from(salt).toHexString();
+    if (id) {
+      salt = keccak256(hexConcat([toUtf8Bytes(id), salt]));
+    }
+    return hexZeroPad(salt, 32);
+  }
+
+  private static cloneAddress(
+    target: BytesLike,
+    {id, salt}: CloneAddressOptions
+  ) {
+    return getCreate2Address(
+      CREATE2_DEPLOYER_ADDRESS,
+      this.generateSalt(id, salt),
+      keccak256(
+        hexConcat([
+          '0x3d602d80600a3d3981f3363d3d373d3d3d363d73',
+          target,
+          '0x5af43d82803e903d91602b57fd5bf3',
+        ])
+      )
+    );
   }
 
   async validate(...args: any[]) {
@@ -155,11 +238,13 @@ export class Deployer {
     const code = await this.provider.getCode(contractAddress);
 
     if (hexDataLength(code)) {
+      debug('clone already exists ' + target);
       return {
         deployed: Promise.resolve(contractAddress),
         address: contractAddress,
       };
     } else {
+      debug('cloning ' + target);
       const tx = await this.create2Deployer.clone(
         target,
         this.generateSalt(id, salt),
@@ -220,9 +305,9 @@ export class Deployer {
 
   cloneAddress(
     target: BytesLike,
-    {id, salt}: CloneAddressOptions = {}
+    {id, salt = this.defaultSalt}: CloneAddressOptions = {}
   ): string {
-    return Deployer.cloneAddress(target, this.generateSalt(id, salt));
+    return Deployer.cloneAddress(target, {id, salt});
   }
 
   async templateAddress(
@@ -346,99 +431,7 @@ export class Deployer {
     return templateId;
   }
 
-  static templateId<T extends ContractFactory = ContractFactory>(
-    factory: T,
-    args?: Head<Parameters<T['deploy']>>
-  ) {
-    return keccak256(Deployer.bytecode(factory, args));
-  }
-
-  static bytecode(factory: ContractFactory, args: unknown[] = []) {
-    const abiEncodedArgs = args
-      ? defaultAbiCoder.encode(
-          factory.interface.deploy.inputs.map(param => param.format('full')),
-          args
-        )
-      : '0x';
-    return hexConcat([factory.bytecode, abiEncodedArgs]);
-  }
-
-  private static cloneAddress(target: BytesLike, salt: BigNumberish) {
-    const hashed = keccak256(
-      hexConcat([
-        '0x3d602d80600a3d3981f3363d3d373d3d3d363d73',
-        target,
-        '0x5af43d82803e903d91602b57fd5bf3ff',
-      ])
-    );
-
-    return hexDataSlice(
-      keccak256(
-        hexConcat([
-          CREATE2_DEPLOYER_ADDRESS,
-          hexZeroPad(BigNumber.from(salt).toHexString(), 32),
-          hashed,
-        ])
-      ),
-      0,
-      20
-    );
-  }
-
-  static factoryAddress<T extends ContractFactory>(
-    factory: T,
-    {id, args, salt}: FactoryAddressOptions<T> = {}
-  ): string {
-    return this.deployAddress(this.bytecode(factory, args), {id, salt});
-  }
-
-  static deployAddress(
-    bytecode: BytesLike,
-    {id, salt}: DeployAddressOptions = {}
-  ) {
-    const hash = keccak256(
-      hexConcat([
-        '0xff',
-        CREATE2_DEPLOYER_ADDRESS,
-        this.generateSalt(id, salt),
-        keccak256(bytecode),
-      ])
-    );
-    return hexDataSlice(hash, 12, 32);
-  }
-
-  static async from(signer: JsonRpcSigner, defaultSalt?: BigNumberish) {
-    return new Deployer(await SignerWithAddress.create(signer), defaultSalt);
-  }
-
-  static async formatCalls(
-    calls: (Create2Deployer.FunctionCallStruct | PromiseOrValue<BytesLike>)[],
-    defaultTarget: string
-  ): Promise<Create2Deployer.FunctionCallStruct[]> {
-    return Promise.all(
-      calls.map(async (call): Promise<Create2Deployer.FunctionCallStruct> => {
-        call = await call;
-        if (typeof call === 'string' || 'length' in call) {
-          return {
-            target: defaultTarget,
-            data: call,
-          };
-        } else {
-          return call;
-        }
-      })
-    );
-  }
-
   generateSalt(id?: string, salt = this.defaultSalt) {
     return Deployer.generateSalt(id, salt);
-  }
-
-  static generateSalt(id?: string, salt: BigNumberish = BigNumber.from(0)) {
-    salt = BigNumber.from(salt).toHexString();
-    if (id) {
-      salt = keccak256(hexConcat([toUtf8Bytes(id), salt]));
-    }
-    return hexZeroPad(salt, 32);
   }
 }
