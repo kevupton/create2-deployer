@@ -157,6 +157,14 @@ export class Environment {
     await Promise.all(verifyCommands);
   }
 
+  async configure() {
+    const configs = await this._sortConfigurations('configure');
+    await this._prepareSettings(configs, 'configure');
+    await this._configure(configs);
+
+    this._checkErrors();
+  }
+
   async upgrade() {
     const addresses = await this.addresses;
 
