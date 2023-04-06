@@ -37,7 +37,6 @@ import {
   hexDataLength,
   hexlify,
   isBytesLike,
-  isHexString,
   keccak256,
   toUtf8Bytes,
 } from 'ethers/lib/utils';
@@ -541,7 +540,14 @@ export class Environment {
         continue;
       }
 
-      if (contract.deployTransaction && config.initialize) {
+      const {CREATE2_FORCE_INITIALIZE} = process.env;
+      if (
+        (contract.deployTransaction ||
+          (CREATE2_FORCE_INITIALIZE &&
+            (CREATE2_FORCE_INITIALIZE === '*' ||
+              CREATE2_FORCE_INITIALIZE.includes(config.id)))) &&
+        config.initialize
+      ) {
         try {
           console.log('initializing', config.id);
           await config.initialize.call(await this._createContext(config));
