@@ -163,7 +163,6 @@ export class Environment {
 
     this._checkErrors();
   }
-
   async upgrade() {
     const addresses = await this.addresses;
 
@@ -190,6 +189,26 @@ export class Environment {
     this._checkErrors();
 
     return this.contracts as ContractSuite;
+  }
+
+  async getSigner(address: string, defaultSigner?: Signer) {
+    const deployer = await this.deployer;
+    const code = await deployer.provider.getCode(address);
+    defaultSigner = defaultSigner ?? deployer.signer;
+
+    if (BigNumber.from(address).eq(deployer.signer.address)) {
+      return deployer.signer;
+    }
+
+    if (BigNumber.from(address).eq(await defaultSigner.getAddress())) {
+      return defaultSigner;
+    }
+
+    if (hexDataLength(code) > 0) {
+      return await getSafeSigner(address, defaultSigner);
+    }
+
+    return await this.hre.ethers.getSigner(address);
   }
 
   private async _parseConfig(
