@@ -5,7 +5,7 @@ import Safe from '@safe-global/protocol-kit';
 import {Provider} from '@ethersproject/providers';
 
 const SAFE_SERVICE_URL =
-  process.env.SAFE_SERVICE_URL || 'https://safe-transaction.goerli.gnosis.io/';
+  process.env.SAFE_SERVICE_URL || 'https://safe-transaction-goerli.gnosis.io/';
 
 export async function getSafeSigner(
   safeAddress: string,
