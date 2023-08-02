@@ -58,13 +58,13 @@ export async function upgradeTransparentUpgradeableProxy<
     tx = await proxyAdmin.upgrade(proxy.address, implementation.address);
   }
 
-  if (signer instanceof SafeEthersSigner) {
-    console.log('sent safe tx of to be signed: ' + tx.hash);
-  } else {
-    await wait(tx, {
+  await wait(
+    tx,
+    {
       name: 'Proxy(' + proxy.constructor.name + ')',
       action: call ? 'upgradeAndCall' : 'upgrade',
       address: proxy.address,
-    });
-  }
+    },
+    proxyAdmin.signer
+  );
 }

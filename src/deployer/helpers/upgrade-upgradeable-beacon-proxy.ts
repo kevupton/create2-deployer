@@ -35,13 +35,13 @@ export async function upgradeUpgradeableBeaconProxy<
 
   const tx = await beacon.upgradeTo(implementation.address);
 
-  if (signer instanceof SafeEthersSigner) {
-    console.log('sent safe tx to be signed: ' + tx.hash);
-  } else {
-    await wait(tx, {
+  await wait(
+    tx,
+    {
       name: 'Beacon(' + beacon.constructor.name + ')',
       action: 'upgradeTo',
       address: beacon.address,
-    });
-  }
+    },
+    beacon.signer
+  );
 }

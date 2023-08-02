@@ -10,4 +10,4 @@ export * from './get-overrides';
 export * from './get-fireblocks-signer';
 export * from './deploy-upgradeable-beacon';
 export * from './upgrade-upgradeable-beacon-proxy';
-export * from './is-safe-signer';
+export * from './is-multi-sig-signer';
