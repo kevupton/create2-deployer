@@ -1695,7 +1695,7 @@
     proper-lockfile "^4.1.1"
     solidity-ast "^0.4.15"
 
-"@safe-global/protocol-kit@^1.2.0":
+"@safe-global/protocol-kit@^1.0.0", "@safe-global/protocol-kit@^1.2.0":
   version "1.2.0"
   resolved "https://registry.yarnpkg.com/@safe-global/protocol-kit/-/protocol-kit-1.2.0.tgz#5501fa0e2a1b4ad03cd5a4ee12bb9e799e1dd5a7"
   integrity sha512-drU2uK30AZ4tqI/9ER7PGMD/lZp/5B9T02t+noTk7WF9Xb7HxskJd8GNU01KE55oyH31Y0AfXaE68H/f9lYa4A==
@@ -1721,7 +1721,7 @@
     web3-core "^1.8.1"
     web3-utils "^1.8.1"
 
-"@safe-global/safe-core-sdk-types@^1.9.1", "@safe-global/safe-core-sdk-types@^1.9.2":
+"@safe-global/safe-core-sdk-types@^1.9.2":
   version "1.10.1"
   resolved "https://registry.yarnpkg.com/@safe-global/safe-core-sdk-types/-/safe-core-sdk-types-1.10.1.tgz#94331b982671d2f2b8cc23114c58baf63d460c81"
   integrity sha512-BKvuYTLOlY16Rq6qCXglmnL6KxInDuXMFqZMaCzwDKiEh+uoHu3xCumG5tVtWOkCgBF4XEZXMqwZUiLcon7IsA==
@@ -1729,6 +1729,17 @@
     "@ethersproject/bignumber" "^5.7.0"
     "@ethersproject/contracts" "^5.7.0"
     "@safe-global/safe-deployments" "^1.20.2"
+    web3-core "^1.8.1"
+    web3-utils "^1.8.1"
+
+"@safe-global/safe-core-sdk-types@^2.0.0":
+  version "2.2.0"
+  resolved "https://registry.yarnpkg.com/@safe-global/safe-core-sdk-types/-/safe-core-sdk-types-2.2.0.tgz#2e34a5089035719e9a92a0bc6aa181c2edb0f108"
+  integrity sha512-vVG9qQnUYx+Xwsbuqraq25MPJX1I1aV1P81ZnHZa1lEMU7stqYWAmykUm/mvqsm8+AsvEB/wBKlFjbFJ/duzoA==
+  dependencies:
+    "@ethersproject/bignumber" "^5.7.0"
+    "@ethersproject/contracts" "^5.7.0"
+    "@safe-global/safe-deployments" "^1.26.0"
     web3-core "^1.8.1"
     web3-utils "^1.8.1"
 
@@ -1741,7 +1752,7 @@
     semver "^7.3.8"
     web3-utils "^1.8.1"
 
-"@safe-global/safe-core-sdk@^3.3.3", "@safe-global/safe-core-sdk@^3.3.4":
+"@safe-global/safe-core-sdk@^3.3.4":
   version "3.3.4"
   resolved "https://registry.yarnpkg.com/@safe-global/safe-core-sdk/-/safe-core-sdk-3.3.4.tgz#d404287f9b910feab3e692243aaf62494ff2d2a9"
   integrity sha512-tgcK7VWo66Z8632xaYDzUHQ8InPOaI10ELk1wCrO/C3QjPwxjIozbMGOMzF4RZPCSJX2YAHowAvOgmEukgSkxA==
@@ -1761,13 +1772,13 @@
   dependencies:
     semver "^7.3.7"
 
-"@safe-global/safe-ethers-adapters@^0.1.0-alpha.17":
-  version "0.1.0-alpha.17"
-  resolved "https://registry.yarnpkg.com/@safe-global/safe-ethers-adapters/-/safe-ethers-adapters-0.1.0-alpha.17.tgz#87ef145c04bf9fc08e7d722d738e7bd9ea63b16a"
-  integrity sha512-02+emAnnXZAOwld1Ucen6idnMCAD76TXrhmuteYsdYoPjl5Eyq1ySb9tzIjCWklgfjMHQtrHSHDJqwdlHFM4GQ==
+"@safe-global/safe-ethers-adapters@^0.2.0-alpha.0":
+  version "0.2.0-alpha.0"
+  resolved "https://registry.yarnpkg.com/@safe-global/safe-ethers-adapters/-/safe-ethers-adapters-0.2.0-alpha.0.tgz#47d7aa0a89cd568edaf5a4a070b723c165666fab"
+  integrity sha512-171AmXiYmqEt3U6Jkddnl8hleqf63kHpWwQxp6qKuJqr/zHcMmlDLoHJWoIqYFrUu5b0sb4ZYHjOGRnWjXwR6A==
   dependencies:
-    "@safe-global/safe-core-sdk" "^3.3.3"
-    "@safe-global/safe-core-sdk-types" "^1.9.1"
+    "@safe-global/protocol-kit" "^1.0.0"
+    "@safe-global/safe-core-sdk-types" "^2.0.0"
     "@safe-global/safe-deployments" "^1.22.0"
     axios "^0.27.2"
 
@@ -5108,10 +5119,10 @@ hardhat-gas-reporter@^1.0.8:
     eth-gas-reporter "^0.2.25"
     sha1 "^1.1.1"
 
-hardhat-package@^1.0.0-beta.15:
-  version "1.0.0-beta.15"
-  resolved "https://registry.yarnpkg.com/hardhat-package/-/hardhat-package-1.0.0-beta.15.tgz#ce27ea381d5f30e97126cc9701edfecbb8fbb008"
-  integrity sha512-9bxk9ZIQ33li17UpRMkGBuXT/B1GPPOrAdBNQ+F1npOzrwJM1Jkp5y/fymcabcRscNM6qurq61vHLMuO9M4PaA==
+hardhat-package@^1.0.0-beta.16:
+  version "1.0.0-beta.16"
+  resolved "https://registry.yarnpkg.com/hardhat-package/-/hardhat-package-1.0.0-beta.16.tgz#922092fe93365b718cdf342544bac3d1d4309c3f"
+  integrity sha512-cTVR1aXwnRjsLa90zSp+VgZ7qGY1mT0qQFG64UIIAMAtfFfcO0uHZadMEJHntLZ+1V2C3vtd+uzgfny1iTuKcg==
   dependencies:
     "@babel/core" "^7.18.13"
     "@babel/preset-env" "^7.18.10"
