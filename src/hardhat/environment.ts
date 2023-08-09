@@ -435,7 +435,7 @@ export class Environment {
       }
 
       if (isBytesLike(roleAdmin) && hexDataLength(roleAdmin) === 20) {
-        roleAdmin = await this.hre.ethers.getSigner(hexlify(roleAdmin));
+        roleAdmin = await this.getSigner(hexlify(roleAdmin), contract.signer);
       } else {
         roleAdmin = undefined;
       }
