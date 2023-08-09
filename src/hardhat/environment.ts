@@ -33,6 +33,7 @@ import {
   getTemplateAddress,
 } from '../deployer';
 import {
+  getAddress,
   hexConcat,
   hexDataLength,
   hexlify,
@@ -195,6 +196,8 @@ export class Environment {
     const deployer = await this.deployer;
     const code = await deployer.provider.getCode(address);
     defaultSigner = defaultSigner ?? deployer.signer;
+
+    address = getAddress(address);
 
     if (BigNumber.from(address).eq(deployer.signer.address)) {
       debug('using deployer signer: ' + address);
@@ -724,7 +727,6 @@ export class Environment {
             debug('detected existing proxy admin');
 
             const proxyAdminOwner = await proxyAdmin.owner();
-            const code = await proxyAdmin.provider.getCode(proxyAdminOwner);
 
             debug('proxy admin owner: ' + proxyAdminOwner);
 

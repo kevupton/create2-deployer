@@ -2,11 +2,14 @@ import {SafeEthersSigner, SafeService} from '@safe-global/safe-ethers-adapters';
 import {ethers, Signer} from 'ethers';
 import Safe, {EthersAdapter} from '@safe-global/protocol-kit';
 import {Provider} from '@ethersproject/providers';
+import {getAddress} from 'ethers/lib/utils';
 
 export async function getSafeSigner(
   safeAddress: string,
   signerOrProvider: Signer | Provider
 ) {
+  safeAddress = getAddress(safeAddress);
+
   const service = new SafeService(
     process.env.SAFE_SERVICE_URL ||
       'https://safe-transaction-mainnet.safe.global/'
