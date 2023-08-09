@@ -197,17 +197,21 @@ export class Environment {
     defaultSigner = defaultSigner ?? deployer.signer;
 
     if (BigNumber.from(address).eq(deployer.signer.address)) {
+      debug('using deployer signer: ' + address);
       return deployer.signer;
     }
 
     if (BigNumber.from(address).eq(await defaultSigner.getAddress())) {
+      debug('using default signer: ' + address);
       return defaultSigner;
     }
 
     if (hexDataLength(code) > 0) {
+      debug('using gnosis safe signer: ' + address);
       return await getSafeSigner(address, defaultSigner);
     }
 
+    debug('attempting to get signer through hardhat: ' + address);
     return await this.hre.ethers.getSigner(address);
   }
 
@@ -731,17 +735,8 @@ export class Environment {
                 'using custom specified signer to upgrade ' +
                   (await config.proxy.owner.getAddress())
               );
-            } else if (hexDataLength(code) > 0) {
-              signer = await getSafeSigner(proxyAdminOwner, proxyAdmin.signer);
-              debug(
-                'using gnosis safe wallet to upgrade ' +
-                  (await signer.getAddress())
-              );
-            } else if (
-              !BigNumber.from(proxyAdminOwner).eq(deployer.signer.address)
-            ) {
-              signer = await this.hre.ethers.getSigner(proxyAdminOwner);
-              debug('using signer specified via owner: ' + proxyAdminOwner);
+            } else {
+              signer = await this.getSigner(proxyAdminOwner, proxyAdmin.signer);
             }
 
             if (signer) {
