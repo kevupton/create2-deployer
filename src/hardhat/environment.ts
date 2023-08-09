@@ -428,7 +428,10 @@ export class Environment {
 
       let roleAdmin: BytesLike | Signer | undefined;
       if (typeof config.roleAdmin === 'function') {
-        roleAdmin = await config.roleAdmin(contract);
+        roleAdmin = await config.roleAdmin.call(
+          await this._createContext(config),
+          contract
+        );
       }
 
       if (isBytesLike(roleAdmin) && hexDataLength(roleAdmin) === 20) {
