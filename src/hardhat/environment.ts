@@ -684,10 +684,11 @@ export class Environment {
     if ('proxy' in config) {
       debug('deployment is a proxy');
 
+      address = this._getProxyAddress(deployer, config);
+      debug('proxy address ' + address);
+      const code = await deployer.provider.getCode(address);
+
       if (typeof config.deployOptions === 'function') {
-        address = this._getProxyAddress(deployer, config);
-        debug('proxy address ' + address);
-        const code = await deployer.provider.getCode(address);
         options = await config.deployOptions.call(this._createContext(config), {
           address,
           deployed: hexDataLength(code) > 0,
